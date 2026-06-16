@@ -1,5 +1,7 @@
 # 📱 Mobile Light Novel Reader
 
+> 🚧 **Note:** This project is currently in the **development phase**. Features are still being actively built and refined!
+
 A sleek, performant, and fully featured Light Novel reading application built with **React Native** and **Expo**. It functions similarly to popular manga/novel reader apps (like Tachiyomi/Mihon), allowing users to browse web novel sources, read chapters with a clean immersive UI, and save novels to their local library.
 
 ## ✨ Features
