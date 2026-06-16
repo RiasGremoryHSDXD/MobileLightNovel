@@ -39,3 +39,8 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Custom Scratch Files
+testNF.js
+read_html.js
+novel_details.html
