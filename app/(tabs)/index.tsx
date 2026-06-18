@@ -154,30 +154,43 @@ export default function LibraryScreen() {
       <Modal visible={isModalVisible} transparent={true} animationType="fade" onRequestClose={closeNovelModal}>
         <RNView style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeNovelModal} />
-          <RNView style={styles.modalContent}>
-            <RNView style={styles.modalHeader}>
-              <Feather name="folder" size={20} color="#1E90FF" />
-              <Text style={styles.modalTitle} lightColor="#fff" darkColor="#fff">{selectedNovel?.title}</Text>
+          <RNView style={styles.manageModalContent}>
+            {/* Header */}
+            <RNView style={styles.manageModalHeader}>
+              <RNView style={styles.manageModalHeaderLeft}>
+                <RNView style={styles.manageIconBg}>
+                  <Feather name="folder" size={18} color="#fff" />
+                </RNView>
+                <RNView>
+                  <Text style={[styles.manageModalTitle, {maxWidth: 180}]} numberOfLines={1} lightColor="#fff" darkColor="#fff">{selectedNovel?.title}</Text>
+                  <Text style={styles.manageModalSubtitle} lightColor="#888" darkColor="#888">Move to Category</Text>
+                </RNView>
+              </RNView>
+              <TouchableOpacity onPress={closeNovelModal} style={styles.manageCloseBtn}>
+                <Feather name="x" size={20} color="#888" />
+              </TouchableOpacity>
             </RNView>
-            <Text style={styles.modalSubtitle} lightColor="#999" darkColor="#999">Move to Category:</Text>
+
+            {/* Divider */}
+            <RNView style={styles.manageDivider} />
             
-            <ScrollView style={styles.modalCategoryList}>
+            <ScrollView style={styles.manageCatList}>
               {categories.map((cat) => {
                 const isActive = selectedNovel?.categoryId === cat.id;
                 return (
                   <TouchableOpacity 
                     key={cat.id} 
-                    style={[styles.modalCategoryRow, isActive && styles.activeModalCategoryRow]}
+                    style={[styles.manageCatRow, isActive && { backgroundColor: 'rgba(30,144,255,0.1)' }]}
                     onPress={() => handleMoveCategory(cat.id)}
                   >
-                    <RNView style={styles.modalCategoryRowInner}>
+                    <RNView style={styles.manageCatInfo}>
                       <Feather 
                         name={isActive ? 'check-circle' : 'circle'} 
                         size={18} 
                         color={isActive ? '#1E90FF' : '#555'} 
                       />
                       <Text 
-                        style={[styles.modalCategoryText, isActive && styles.activeModalCategoryText]} 
+                        style={[styles.manageCatName, isActive && { fontWeight: 'bold' }]} 
                         lightColor={isActive ? '#1E90FF' : '#ddd'} 
                         darkColor={isActive ? '#1E90FF' : '#ddd'}
                       >
@@ -193,10 +206,6 @@ export default function LibraryScreen() {
               <Feather name="trash-2" size={16} color="#FF4444" style={{ marginRight: 6 }} />
               <Text style={styles.removeButtonText} lightColor="#FF4444" darkColor="#FF4444">Remove from Library</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.cancelButton} onPress={closeNovelModal}>
-              <Text style={styles.cancelButtonText} lightColor="#888" darkColor="#888">Cancel</Text>
-            </TouchableOpacity>
           </RNView>
         </RNView>
       </Modal>
@@ -205,52 +214,82 @@ export default function LibraryScreen() {
       <Modal visible={isManageModalVisible} transparent={true} animationType="fade" onRequestClose={() => setIsManageModalVisible(false)}>
         <RNView style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsManageModalVisible(false)} />
-          <RNView style={styles.modalContent}>
-            <RNView style={styles.modalHeader}>
-              <Feather name="settings" size={20} color="#1E90FF" />
-              <Text style={styles.modalTitle} lightColor="#fff" darkColor="#fff">Manage Categories</Text>
+          <RNView style={styles.manageModalContent}>
+            {/* Header */}
+            <RNView style={styles.manageModalHeader}>
+              <RNView style={styles.manageModalHeaderLeft}>
+                <RNView style={styles.manageIconBg}>
+                  <Feather name="folder" size={18} color="#fff" />
+                </RNView>
+                <RNView>
+                  <Text style={styles.manageModalTitle} lightColor="#fff" darkColor="#fff">Manage Categories</Text>
+                  <Text style={styles.manageModalSubtitle} lightColor="#888" darkColor="#888">Create or remove folders</Text>
+                </RNView>
+              </RNView>
+              <TouchableOpacity onPress={() => setIsManageModalVisible(false)} style={styles.manageCloseBtn}>
+                <Feather name="x" size={20} color="#888" />
+              </TouchableOpacity>
             </RNView>
-            <Text style={styles.modalSubtitle} lightColor="#999" darkColor="#999">Create or remove folders</Text>
 
-            <RNView style={styles.addCategoryContainer}>
+            {/* Divider */}
+            <RNView style={styles.manageDivider} />
+
+            {/* Add new category */}
+            <RNView style={styles.manageAddRow}>
               <TextInput
-                style={styles.addCategoryInput}
+                style={styles.manageAddInput}
                 placeholder="New category name..."
-                placeholderTextColor="#666"
+                placeholderTextColor="#555"
                 value={newCategoryName}
                 onChangeText={setNewCategoryName}
                 onSubmitEditing={handleAddCategory}
               />
-              <TouchableOpacity style={styles.addButton} onPress={handleAddCategory}>
-                <Feather name="plus" size={20} color="#fff" />
+              <TouchableOpacity style={styles.manageAddBtn} onPress={handleAddCategory}>
+                <Feather name="plus" size={18} color="#fff" />
               </TouchableOpacity>
             </RNView>
-            
-            <ScrollView style={styles.modalCategoryList}>
-              {[...categories].sort((a, b) => a.isSystemDefault - b.isSystemDefault).map((cat) => (
-                <RNView key={cat.id} style={styles.manageCategoryRow}>
-                  <RNView style={styles.manageCategoryInfo}>
-                    <Feather name="folder" size={16} color={cat.isSystemDefault ? '#1E90FF' : '#888'} />
-                    <Text style={styles.modalCategoryText} lightColor="#ddd" darkColor="#ddd">{cat.name}</Text>
-                    {cat.isSystemDefault === 1 && (
-                      <RNView style={styles.systemBadge}>
-                        <Text style={styles.systemBadgeText}>System</Text>
-                      </RNView>
-                    )}
+
+            {/* Category list */}
+            <ScrollView style={styles.manageCatList} showsVerticalScrollIndicator={false}>
+              {/* Custom categories section */}
+              {[...categories].filter(c => c.isSystemDefault === 0).length > 0 && (
+                <RNView style={styles.manageSectionHeader}>
+                  <Text style={styles.manageSectionTitle} lightColor="#1E90FF" darkColor="#1E90FF">Your Categories</Text>
+                </RNView>
+              )}
+              {[...categories].filter(c => c.isSystemDefault === 0).map((cat) => (
+                <RNView key={cat.id} style={styles.manageCatRow}>
+                  <RNView style={styles.manageCatInfo}>
+                    <Feather name="folder" size={16} color="#1E90FF" />
+                    <Text style={styles.manageCatName} lightColor="#eee" darkColor="#eee">{cat.name}</Text>
                   </RNView>
-                  {cat.isSystemDefault === 0 ? (
-                    <TouchableOpacity onPress={() => handleDeleteCategory(cat.id)} style={styles.deleteCategoryButton}>
-                      <Feather name="trash" size={16} color="#FF3B30" />
-                    </TouchableOpacity>
-                  ) : (
-                    <Feather name="lock" size={14} color="#444" style={{ padding: 8 }} />
-                  )}
+                  <TouchableOpacity onPress={() => handleDeleteCategory(cat.id)} style={styles.manageDeleteBtn}>
+                    <Feather name="trash-2" size={15} color="#FF4444" />
+                  </TouchableOpacity>
+                </RNView>
+              ))}
+
+              {/* System categories section */}
+              <RNView style={styles.manageSectionHeader}>
+                <Text style={styles.manageSectionTitle} lightColor="#666" darkColor="#666">System Categories</Text>
+              </RNView>
+              {[...categories].filter(c => c.isSystemDefault === 1).map((cat) => (
+                <RNView key={cat.id} style={styles.manageCatRow}>
+                  <RNView style={styles.manageCatInfo}>
+                    <Feather name="folder" size={16} color="#555" />
+                    <Text style={styles.manageCatName} lightColor="#999" darkColor="#999">{cat.name}</Text>
+                    <RNView style={styles.manageSystemTag}>
+                      <Text style={styles.manageSystemTagText}>System</Text>
+                    </RNView>
+                  </RNView>
+                  <Feather name="lock" size={13} color="#444" style={{ padding: 8 }} />
                 </RNView>
               ))}
             </ScrollView>
-            
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setIsManageModalVisible(false)}>
-              <Text style={styles.cancelButtonText} lightColor="#888" darkColor="#888">Close</Text>
+
+            {/* Close button */}
+            <TouchableOpacity style={styles.manageCloseButton} onPress={() => setIsManageModalVisible(false)}>
+              <Text style={styles.manageCloseButtonText} lightColor="#1E90FF" darkColor="#1E90FF">Done</Text>
             </TouchableOpacity>
           </RNView>
         </RNView>
@@ -463,5 +502,147 @@ const styles = StyleSheet.create({
   },
   deleteCategoryButton: {
     padding: 8,
+  },
+  // --- Redesigned Manage Categories Modal ---
+  manageModalContent: {
+    width: '88%',
+    backgroundColor: '#1C1C1E',
+    borderRadius: 20,
+    padding: 20,
+    maxHeight: '75%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+  },
+  manageModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  manageModalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  manageIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#1E90FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageModalTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  manageModalSubtitle: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  manageCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginVertical: 16,
+  },
+  manageAddRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  manageAddInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#fff',
+    fontSize: 14,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  manageAddBtn: {
+    backgroundColor: '#1E90FF',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageCatList: {
+    maxHeight: 280,
+  },
+  manageSectionHeader: {
+    marginTop: 4,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  manageSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  manageCatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    marginBottom: 2,
+  },
+  manageCatInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  manageCatName: {
+    fontSize: 15,
+  },
+  manageDeleteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,68,68,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageSystemTag: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 2,
+  },
+  manageSystemTagText: {
+    fontSize: 10,
+    color: '#555',
+    fontWeight: '600',
+  },
+  manageCloseButton: {
+    marginTop: 14,
+    paddingVertical: 13,
+    alignItems: 'center',
+    backgroundColor: 'rgba(30,144,255,0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(30,144,255,0.15)',
+  },
+  manageCloseButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

@@ -354,33 +354,45 @@ export default function NovelDetailsScreen() {
 
       {/* Category Selection Modal */}
       <Modal visible={isCategoryModalVisible} transparent={true} animationType="fade" onRequestClose={() => setIsCategoryModalVisible(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setIsCategoryModalVisible(false)}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-            <RNView style={styles.modalHeader}>
-              <Feather name="bookmark" size={20} color="#1E90FF" />
-              <Text style={styles.modalTitle} lightColor="#fff" darkColor="#fff">Save to Category</Text>
+        <RNView style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsCategoryModalVisible(false)} />
+          <RNView style={styles.manageModalContent}>
+            {/* Header */}
+            <RNView style={styles.manageModalHeader}>
+              <RNView style={styles.manageModalHeaderLeft}>
+                <RNView style={styles.manageIconBg}>
+                  <Feather name="bookmark" size={18} color="#fff" />
+                </RNView>
+                <RNView>
+                  <Text style={styles.manageModalTitle} lightColor="#fff" darkColor="#fff">Save to Category</Text>
+                  <Text style={styles.manageModalSubtitle} lightColor="#888" darkColor="#888">Choose a folder</Text>
+                </RNView>
+              </RNView>
+              <TouchableOpacity onPress={() => setIsCategoryModalVisible(false)} style={styles.manageCloseBtn}>
+                <Feather name="x" size={20} color="#888" />
+              </TouchableOpacity>
             </RNView>
-            <Text style={styles.modalSubtitleText} lightColor="#999" darkColor="#999">Choose a folder for this novel:</Text>
-            <ScrollView style={styles.modalCategoryList}>
+
+            {/* Divider */}
+            <RNView style={styles.manageDivider} />
+
+            <ScrollView style={styles.manageCatList}>
               {categories.map((cat) => (
                 <TouchableOpacity 
                   key={cat.id} 
-                  style={styles.modalCategoryRow}
+                  style={styles.manageCatRow}
                   onPress={() => handleSaveToCategory(cat.id)}
                 >
-                  <RNView style={styles.modalCategoryRowInner}>
+                  <RNView style={styles.manageCatInfo}>
                     <Feather name="folder" size={16} color="#1E90FF" />
-                    <Text style={styles.modalCategoryText} lightColor="#ddd" darkColor="#ddd">{cat.name}</Text>
+                    <Text style={styles.manageCatName} lightColor="#ddd" darkColor="#ddd">{cat.name}</Text>
                   </RNView>
                   <Feather name="chevron-right" size={16} color="#555" />
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setIsCategoryModalVisible(false)}>
-              <Text style={styles.cancelButtonText} lightColor="#888" darkColor="#888">Cancel</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
+          </RNView>
+        </RNView>
       </Modal>
     </View>
   );
@@ -567,55 +579,77 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
-    width: '85%',
+  // --- Redesigned Modal Styles ---
+  manageModalContent: {
+    width: '88%',
     backgroundColor: '#1C1C1E',
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
-    maxHeight: '80%',
+    maxHeight: '75%',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-    gap: 8,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-  },
-  modalSubtitleText: {
-    fontSize: 13,
-    marginBottom: 12,
-    marginLeft: 28,
-  },
-  modalCategoryList: {
-    maxHeight: 250,
-  },
-  modalCategoryRow: {
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 8,
+  manageModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  modalCategoryRowInner: {
+  manageModalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  manageIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#1E90FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageModalTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  manageModalSubtitle: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  manageCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginVertical: 16,
+  },
+  manageCatList: {
+    maxHeight: 280,
+  },
+  manageCatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    marginBottom: 2,
+  },
+  manageCatInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
-  modalCategoryText: {
-    fontSize: 15,
-  },
-  cancelButton: {
-    marginTop: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
+  manageCatName: {
     fontSize: 15,
   },
 });
