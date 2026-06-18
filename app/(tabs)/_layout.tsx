@@ -1,11 +1,11 @@
 import Feather from '@expo/vector-icons/Feather';
-import { Tabs, useFocusEffect } from 'expo-router';
-import React, { useState, useCallback } from 'react';
+import { Tabs } from 'expo-router';
+import React, { useState, useEffect } from 'react';
 
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, DeviceEventEmitter } from 'react-native';
 import { getUnreadUpdatesCount } from '../../services/database/Database';
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
@@ -20,11 +20,13 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useFocusEffect(
-    useCallback(() => {
-      setUnreadCount(getUnreadUpdatesCount());
-    }, [])
-  );
+  useEffect(() => {
+    const updateCount = () => setUnreadCount(getUnreadUpdatesCount());
+    updateCount();
+    
+    const subscription = DeviceEventEmitter.addListener('updatesChanged', updateCount);
+    return () => subscription.remove();
+  }, []);
 
   return (
     <Tabs
