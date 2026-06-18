@@ -1,5 +1,5 @@
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, TextInput, TouchableOpacity, useColorScheme, Keyboard, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import Feather from '@expo/vector-icons/Feather';
@@ -17,10 +17,15 @@ export default function SourceScreen() {
 
   const extension = ExtensionManager.getExtension(id as string);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  // Ref holds the live text so typing never triggers a re-render
+  const searchRef = useRef('');
+
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+
+  // Cache the initial popular novels so we can restore them when search closes
+  const popularNovelsRef = useRef<any[]>([]);
 
   useEffect(() => {
     async function loadNovels() {
@@ -28,6 +33,7 @@ export default function SourceScreen() {
       const cached = await getCache(cacheKey);
       if (cached) {
         setResults(cached);
+        popularNovelsRef.current = cached;
       }
 
       const extension = ExtensionManager.getExtension(id as string);
@@ -38,6 +44,7 @@ export default function SourceScreen() {
             ? await (extension as any).getPopularNovels() 
             : await extension.searchNovel('');
           setResults(data || []);
+          popularNovelsRef.current = data || [];
           setCache(cacheKey, data || []);
         } catch (e) {
           console.error('Failed to fetch popular novels', e);
@@ -49,18 +56,30 @@ export default function SourceScreen() {
     loadNovels();
   }, [id]);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim() || !extension) return;
+  const handleSearch = useCallback(async () => {
+    const query = searchRef.current.trim();
+    if (!query || !extension) return;
     Keyboard.dismiss();
     setLoading(true);
     try {
-      const novels = await extension.searchNovel(searchQuery);
+      const novels = await extension.searchNovel(query);
       setResults(novels);
     } catch (e) {
       console.error(e);
     }
     setLoading(false);
-  };
+  }, [extension]);
+
+  const closeSearch = useCallback(() => {
+    searchRef.current = '';
+    setShowSearch(false);
+    // Restore the popular novels list
+    setResults(popularNovelsRef.current);
+  }, []);
+
+  const openSearch = useCallback(() => {
+    setShowSearch(true);
+  }, []);
 
   const NovelListItem = ({ item, onPress }: any) => {
     return (
@@ -108,7 +127,7 @@ export default function SourceScreen() {
         options={{
           headerLeft: showSearch
             ? () => (
-                <TouchableOpacity onPress={() => setShowSearch(false)} style={{ marginLeft: 0, marginRight: 15 }}>
+                <TouchableOpacity onPress={closeSearch} style={{ marginLeft: 0, marginRight: 15 }}>
                   <Feather name="arrow-left" size={24} color={iconColor} />
                 </TouchableOpacity>
               )
@@ -119,8 +138,8 @@ export default function SourceScreen() {
                   style={{ fontSize: 18, color: iconColor, flex: 1, minWidth: 200 }}
                   placeholder={`Search ${extension.name}...`}
                   placeholderTextColor="#888"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
+                  defaultValue=""
+                  onChangeText={(text) => { searchRef.current = text; }}
                   onSubmitEditing={handleSearch}
                   autoFocus
                 />
@@ -129,7 +148,7 @@ export default function SourceScreen() {
           headerRight: showSearch
             ? undefined
             : () => (
-                <TouchableOpacity onPress={() => setShowSearch(true)} style={{ marginRight: 0 }}>
+                <TouchableOpacity onPress={openSearch} style={{ marginRight: 0 }}>
                   <Feather name="search" size={24} color={iconColor} />
                 </TouchableOpacity>
               )
