@@ -2,8 +2,8 @@ import { StyleSheet, FlatList, TouchableOpacity, RefreshControl, ScrollView, Mod
 import { Image } from 'expo-image';
 import { Text, View } from '@/components/Themed';
 import Feather from '@expo/vector-icons/Feather';
-import { useCallback, useState, useEffect } from 'react';
-import { useFocusEffect, useRouter, useNavigation } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useFocusEffect, useRouter, Tabs } from 'expo-router';
 import { getLibrary, getCategories, changeNovelCategory, removeFromLibrary, addCategory, deleteCategory } from '../../services/database/Database';
 
 export default function LibraryScreen() {
@@ -21,20 +21,6 @@ export default function LibraryScreen() {
   const [newCategoryName, setNewCategoryName] = useState('');
 
   const router = useRouter();
-  const navigation = useNavigation();
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity 
-          onPress={() => setIsManageModalVisible(true)} 
-          style={{ marginRight: 16, padding: 4 }}
-        >
-          <Feather name="settings" size={22} color="#1E90FF" />
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation]);
 
   const loadLibrary = async () => {
     try {
@@ -122,6 +108,16 @@ export default function LibraryScreen() {
 
   return (
     <View style={styles.container}>
+      <Tabs.Screen options={{
+        headerRight: () => (
+          <TouchableOpacity 
+            onPress={() => setIsManageModalVisible(true)} 
+            style={{ marginRight: 16, padding: 4 }}
+          >
+            <Feather name="settings" size={22} color="#1E90FF" />
+          </TouchableOpacity>
+        )
+      }} />
       <View style={styles.tabContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScrollContent}>
           {categories.map((cat) => (
@@ -156,8 +152,9 @@ export default function LibraryScreen() {
 
       {/* Move Category Modal */}
       <Modal visible={isModalVisible} transparent={true} animationType="fade" onRequestClose={closeNovelModal}>
-        <Pressable style={styles.modalOverlay} onPress={closeNovelModal}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+        <RNView style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeNovelModal} />
+          <RNView style={styles.modalContent}>
             <RNView style={styles.modalHeader}>
               <Feather name="folder" size={20} color="#1E90FF" />
               <Text style={styles.modalTitle} lightColor="#fff" darkColor="#fff">{selectedNovel?.title}</Text>
@@ -200,14 +197,15 @@ export default function LibraryScreen() {
             <TouchableOpacity style={styles.cancelButton} onPress={closeNovelModal}>
               <Text style={styles.cancelButtonText} lightColor="#888" darkColor="#888">Cancel</Text>
             </TouchableOpacity>
-          </Pressable>
-        </Pressable>
+          </RNView>
+        </RNView>
       </Modal>
 
       {/* Manage Categories Modal */}
       <Modal visible={isManageModalVisible} transparent={true} animationType="fade" onRequestClose={() => setIsManageModalVisible(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setIsManageModalVisible(false)}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+        <RNView style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsManageModalVisible(false)} />
+          <RNView style={styles.modalContent}>
             <RNView style={styles.modalHeader}>
               <Feather name="settings" size={20} color="#1E90FF" />
               <Text style={styles.modalTitle} lightColor="#fff" darkColor="#fff">Manage Categories</Text>
@@ -229,7 +227,7 @@ export default function LibraryScreen() {
             </RNView>
             
             <ScrollView style={styles.modalCategoryList}>
-              {categories.map((cat) => (
+              {[...categories].sort((a, b) => a.isSystemDefault - b.isSystemDefault).map((cat) => (
                 <RNView key={cat.id} style={styles.manageCategoryRow}>
                   <RNView style={styles.manageCategoryInfo}>
                     <Feather name="folder" size={16} color={cat.isSystemDefault ? '#1E90FF' : '#888'} />
@@ -254,8 +252,8 @@ export default function LibraryScreen() {
             <TouchableOpacity style={styles.cancelButton} onPress={() => setIsManageModalVisible(false)}>
               <Text style={styles.cancelButtonText} lightColor="#888" darkColor="#888">Close</Text>
             </TouchableOpacity>
-          </Pressable>
-        </Pressable>
+          </RNView>
+        </RNView>
       </Modal>
     </View>
   );
