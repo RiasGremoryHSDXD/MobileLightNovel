@@ -116,7 +116,7 @@ export default function ReaderScreen() {
       const newIndex = viewableItems[0].index;
       setCurrentIndex(newIndex);
 
-      const ch = chapters[newIndex];
+      const ch = viewableItems[0].item;
       if (ch && novelUrl && novelTitle) {
         addToHistory(
           decodeURIComponent(novelUrl as string),
