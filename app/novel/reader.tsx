@@ -1,151 +1,173 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, LayoutAnimation, PanResponder, ScrollView, StatusBar, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
-
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Dimensions, FlatList, LayoutAnimation, ScrollView, StatusBar, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
 
 import { Text, View } from '@/components/Themed';
 // @ts-ignore
-import { ExtensionManager } from '../../services/extensions/ExtensionManager';
 import { addToHistory, getCache } from '../../services/database/Database';
+import { ExtensionManager } from '../../services/extensions/ExtensionManager';
+
+const { width } = Dimensions.get('window');
+
+const ChapterPage = React.memo(({ chapter, index, sourceId, fontSize, toggleMenu, registerRef }: any) => {
+  const [content, setContent] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadChapter() {
+      setLoading(true);
+      const decodedUrl = decodeURIComponent(chapter.url);
+      const cacheKey = `chapter_${decodedUrl}`;
+      const cached = getCache(cacheKey);
+
+      if (cached) {
+        if (isMounted) {
+          setContent(cached);
+          setLoading(false);
+        }
+      } else {
+        const extension = ExtensionManager.getExtension(sourceId as string);
+        if (extension && chapter.url) {
+          try {
+            const text = await extension.getChapterContent(decodedUrl);
+            if (isMounted) setContent(text);
+          } catch (e) {
+            if (isMounted) setContent("Failed to load chapter content.");
+          }
+        } else {
+          if (isMounted) setContent("Failed to load chapter content.");
+        }
+        if (isMounted) setLoading(false);
+      }
+    }
+    loadChapter();
+    return () => { isMounted = false; };
+  }, [chapter.url, sourceId]);
+
+  return (
+    <ScrollView
+      ref={registerRef}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={true}
+    >
+      <TouchableOpacity activeOpacity={1} onPress={toggleMenu} style={{ minHeight: '100%' }}>
+        <Text style={[styles.titleText, { fontSize: fontSize + 6, color: colorScheme === 'dark' ? '#fff' : '#000' }]}>
+          {chapter.title}
+        </Text>
+        {loading ? (
+          <ActivityIndicator size="large" color="#1E90FF" style={{ marginTop: 50 }} />
+        ) : (
+          <Text style={[styles.contentText, { fontSize, lineHeight: fontSize * 1.6, color: colorScheme === 'dark' ? '#ccc' : '#333' }]}>
+            {content}
+          </Text>
+        )}
+      </TouchableOpacity>
+    </ScrollView>
+  );
+});
 
 export default function ReaderScreen() {
   const { url, title, sourceId, totalChapters, novelUrl, novelTitle, novelCover } = useLocalSearchParams();
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const scrollViewRef = useRef<ScrollView>(null);
 
-  const currentScrollY = useRef(0);
-  const contentHeight = useRef(0);
-  const scrollViewHeight = useRef(0);
-
-  const [content, setContent] = useState<string>('');
-  const [loading, setLoading] = useState(true);
-
-  // Settings for the reader
+  const [chapters, setChapters] = useState<any[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(-1);
   const [fontSize, setFontSize] = useState(18);
-
-  // Clean UI for immersive reading
   const [showMenu, setShowMenu] = useState(true);
 
+  const flatListRef = useRef<FlatList>(null);
+  const scrollRefs = useRef<{ [key: number]: ScrollView | null }>({}).current;
+
   useEffect(() => {
-    async function loadChapter() {
-      // Record history
-      if (novelUrl && novelTitle) {
-        addToHistory(
-          decodeURIComponent(novelUrl as string),
-          decodeURIComponent(novelTitle as string),
-          novelCover ? decodeURIComponent(novelCover as string) : '',
-          sourceId as string,
-          decodeURIComponent(url as string),
-          decodeURIComponent(title as string)
-        );
-      }
-
+    if (novelUrl) {
+      const decodedNovelUrl = decodeURIComponent(novelUrl as string);
+      const cachedNovel = getCache(`novel_details_${decodedNovelUrl}`);
       const decodedUrl = decodeURIComponent(url as string);
-      const cacheKey = `chapter_${decodedUrl}`;
-      const cached = getCache(cacheKey);
 
-      if (cached) {
-        setContent(cached);
-        setLoading(false);
+      if (cachedNovel && cachedNovel.chapters && cachedNovel.chapters.length > 0) {
+        const reversedChapters = [...cachedNovel.chapters].reverse();
+        setChapters(reversedChapters);
+        const idx = reversedChapters.findIndex((c: any) => c.url === decodedUrl);
+        setCurrentIndex(idx >= 0 ? idx : 0);
       } else {
-        const extension = ExtensionManager.getExtension(sourceId as string);
-        if (extension && url) {
-          const text = await extension.getChapterContent(decodedUrl);
-          setContent(text);
-          // Only explicit downloads via the download button are cached to disk now
-        } else {
-          setContent("Failed to load chapter content.");
-        }
-        setLoading(false);
+        // Fallback if no full chapter list is available
+        setChapters([{ url: decodedUrl, title: decodeURIComponent(title as string) }]);
+        setCurrentIndex(0);
       }
     }
-    loadChapter();
-  }, [url, sourceId]);
+  }, [novelUrl, url]);
 
-  const toggleMenu = () => {
+  const toggleMenu = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setShowMenu(!showMenu);
-  };
+    setShowMenu(prev => !prev);
+  }, []);
 
   const updateFontSize = (newSize: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setFontSize(newSize);
   };
 
-  const customScrollTo = (targetY: number) => {
-    const duration = 2000; // 2 seconds
-    const startY = currentScrollY.current;
-    const distance = targetY - startY;
-    const startTime = Date.now();
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) {
+      const newIndex = viewableItems[0].index;
+      setCurrentIndex(newIndex);
 
-    const step = () => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      // Smooth easeInOutCubic animation
-      const easeProgress = progress < 0.5
-        ? 4 * progress * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-
-      const nextY = startY + distance * easeProgress;
-
-      scrollViewRef.current?.scrollTo({ y: nextY, animated: false });
-
-      if (progress < 1) {
-        requestAnimationFrame(step);
+      const ch = chapters[newIndex];
+      if (ch && novelUrl && novelTitle) {
+        addToHistory(
+          decodeURIComponent(novelUrl as string),
+          decodeURIComponent(novelTitle as string),
+          novelCover ? decodeURIComponent(novelCover as string) : '',
+          sourceId as string,
+          ch.url,
+          ch.title
+        );
       }
-    };
-    requestAnimationFrame(step);
-  };
+    }
+  }).current;
 
-  const scrollToTop = () => customScrollTo(0);
-  const scrollToBottom = () => {
-    const maxScroll = Math.max(0, contentHeight.current - scrollViewHeight.current);
-    customScrollTo(maxScroll);
-  };
-
-  const match = (url as string).match(/(.*chapter-)(\d+)/);
-  const currentNum = match ? parseInt(match[2]) : 0;
-  const hasPrev = currentNum > 1;
-  const hasNext = totalChapters ? currentNum < parseInt(totalChapters as string) : true;
-
-  const handleNextChapter = () => {
-    if (!hasNext || !match) return;
-    const nextNum = currentNum + 1;
-    const nextUrl = match[1] + nextNum;
-    router.replace(`/novel/reader?url=${encodeURIComponent(nextUrl)}&title=${encodeURIComponent('Chapter ' + nextNum)}&sourceId=${sourceId}&totalChapters=${totalChapters}` as any);
-  };
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
 
   const handlePreviousChapter = () => {
-    if (!hasPrev || !match) return;
-    const prevNum = currentNum - 1;
-    const prevUrl = match[1] + prevNum;
-    router.replace(`/novel/reader?url=${encodeURIComponent(prevUrl)}&title=${encodeURIComponent('Chapter ' + prevNum)}&sourceId=${sourceId}&totalChapters=${totalChapters}` as any);
+    if (currentIndex > 0) {
+      flatListRef.current?.scrollToIndex({ index: currentIndex - 1, animated: true });
+    }
   };
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Only intercept if the user is clearly swiping horizontally (not scrolling up/down)
-        return Math.abs(gestureState.dx) > 40 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 2;
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dx > 50) {
-          handlePreviousChapter(); // Swipe right -> Previous chapter
-        } else if (gestureState.dx < -50) {
-          handleNextChapter();     // Swipe left -> Next chapter
-        }
-      },
-    })
-  ).current;
+  const handleNextChapter = () => {
+    if (currentIndex < chapters.length - 1) {
+      flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
+    }
+  };
+
+  const scrollToTop = () => {
+    scrollRefs[currentIndex]?.scrollTo({ y: 0, animated: true });
+  };
+
+  const scrollToBottom = () => {
+    scrollRefs[currentIndex]?.scrollToEnd({ animated: true });
+  };
+
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex < chapters.length - 1;
+
+  if (currentIndex === -1 || chapters.length === 0) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#1E90FF" />
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: decodeURIComponent(title as string || 'Reading'),
+          title: chapters[currentIndex]?.title || decodeURIComponent(title as string || 'Reading'),
           headerShown: showMenu,
           headerTransparent: true,
           headerBackground: () => (
@@ -155,30 +177,36 @@ export default function ReaderScreen() {
       />
       <StatusBar hidden={!showMenu} />
 
-      {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#1E90FF" />
-        </View>
-      ) : (
-        <ScrollView
-          ref={scrollViewRef}
-          contentContainerStyle={styles.scrollContent}
-          onScroll={(e) => { currentScrollY.current = e.nativeEvent.contentOffset.y; }}
-          scrollEventThrottle={16}
-          onContentSizeChange={(w, h) => { contentHeight.current = h; }}
-          onLayout={(e) => { scrollViewHeight.current = e.nativeEvent.layout.height; }}
-        >
-          <TouchableOpacity activeOpacity={1} onPress={toggleMenu} style={{ minHeight: '100%' }}>
-            <Text style={[styles.contentText, { fontSize, lineHeight: fontSize * 1.6, color: colorScheme === 'dark' ? '#ccc' : '#333' }]}>
-              {content}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
+      <FlatList
+        ref={flatListRef}
+        data={chapters}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        initialScrollIndex={currentIndex}
+        getItemLayout={(data, index) => ({ length: width, offset: width * index, index })}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        windowSize={3}
+        maxToRenderPerBatch={1}
+        initialNumToRender={1}
+        keyExtractor={(item, index) => item.url + index}
+        renderItem={({ item, index }) => (
+          <View style={{ width }}>
+            <ChapterPage
+              chapter={item}
+              index={index}
+              sourceId={sourceId}
+              fontSize={fontSize}
+              toggleMenu={toggleMenu}
+              registerRef={(ref: any) => { scrollRefs[index] = ref; }}
+            />
+          </View>
+        )}
+      />
 
-      {showMenu && !loading && (
+      {showMenu && (
         <View style={[styles.bottomMenu, { backgroundColor: colorScheme === 'dark' ? '#111' : '#eee' }]}>
-
           <TouchableOpacity onPress={scrollToTop} style={styles.menuIcon}>
             <Feather name="chevrons-up" size={22} color={colorScheme === 'dark' ? '#fff' : '#000'} />
           </TouchableOpacity>
@@ -204,7 +232,6 @@ export default function ReaderScreen() {
           <TouchableOpacity onPress={scrollToBottom} style={styles.menuIcon}>
             <Feather name="chevrons-down" size={22} color={colorScheme === 'dark' ? '#fff' : '#000'} />
           </TouchableOpacity>
-
         </View>
       )}
     </View>
