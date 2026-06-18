@@ -31,7 +31,7 @@ import {
 } from '../../services/database/Database';
 import { styles } from '../../styles/details.styles';
 
-const CHAPTERS_PER_PAGE = 50;
+const CHAPTERS_PER_PAGE = 100;
 
 const ChapterCard = React.memo(
   ({ item, onPress, downloadedChapters, downloadingChapters, onDownload }: any) => {
@@ -99,19 +99,6 @@ export default function NovelDetailsScreen() {
   // Refs
   const scrollViewRef = useRef<ScrollView>(null);
   const chapterListLayoutY = useRef(0);
-  const scrollY = useRef(new Animated.Value(0)).current;
-
-  const fabOpacity = scrollY.interpolate({
-    inputRange: [0, 400, 500],
-    outputRange: [0, 0, 1],
-    extrapolate: 'clamp',
-  });
-
-  const fabTranslateY = scrollY.interpolate({
-    inputRange: [0, 400, 500],
-    outputRange: [100, 100, 0],
-    extrapolate: 'clamp',
-  });
 
   useEffect(() => {
     try {
@@ -232,6 +219,12 @@ export default function NovelDetailsScreen() {
     setCurrentPage(1);
   }, [searchQuery, sortOrder]);
 
+  const remainder = filteredChapters.length % CHAPTERS_PER_PAGE;
+  const isDescending = sortOrder === 'desc';
+  // If there's a remainder and we're newest-first, put the remainder on page 1
+  // so that subsequent pages land cleanly on hundreds (e.g., 1000-901)
+  const firstPageSize = (isDescending && remainder !== 0) ? remainder : CHAPTERS_PER_PAGE;
+
   const totalPages = Math.max(1, Math.ceil(filteredChapters.length / CHAPTERS_PER_PAGE));
   
   // Ensure currentPage is valid (e.g. if filtered chapters length drops)
@@ -241,8 +234,15 @@ export default function NovelDetailsScreen() {
     }
   }, [currentPage, totalPages]);
 
-  const startIndex = (currentPage - 1) * CHAPTERS_PER_PAGE;
-  const endIndex = startIndex + CHAPTERS_PER_PAGE;
+  let startIndex = 0;
+  let endIndex = 0;
+  if (currentPage === 1) {
+    startIndex = 0;
+    endIndex = firstPageSize;
+  } else {
+    startIndex = firstPageSize + (currentPage - 2) * CHAPTERS_PER_PAGE;
+    endIndex = startIndex + CHAPTERS_PER_PAGE;
+  }
   const paginatedChapters = filteredChapters.slice(startIndex, endIndex);
 
   const scrollToChapterList = () => {
@@ -321,13 +321,9 @@ export default function NovelDetailsScreen() {
         }}
       />
 
-      <Animated.ScrollView
-        ref={scrollViewRef as any}
+      <ScrollView
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: true,
-        })}
-        scrollEventThrottle={16}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
         <View>
@@ -471,56 +467,64 @@ export default function NovelDetailsScreen() {
 
             {/* Bottom Pagination Bar */}
             {totalPages > 1 && (
-              <View style={styles.paginationBottomBar}>
-                <TouchableOpacity
-                  style={[styles.navButton, currentPage === 1 && styles.navButtonDisabled]}
-                  onPress={() => handlePageChange(1)}
-                  disabled={currentPage === 1}
+              <View>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
                 >
-                  <Feather name="chevrons-left" size={20} color={iconColor} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.navButton, currentPage === 1 && styles.navButtonDisabled]}
-                  onPress={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  <Feather name="chevron-left" size={20} color={iconColor} />
-                </TouchableOpacity>
-
-                {generatePageNumbers().map((page, index) =>
-                  page === '...' ? (
-                    <Text key={`ellipsis-${index}`} style={styles.ellipsisText}>
-                      ...
-                    </Text>
-                  ) : (
+                  <View style={styles.paginationBottomBar}>
                     <TouchableOpacity
-                      key={`page-${page}`}
-                      style={[styles.pageButton, currentPage === page && styles.pageButtonActive]}
-                      onPress={() => handlePageChange(page as number)}
+                      style={[styles.navButton, currentPage === 1 && styles.navButtonDisabled]}
+                      onPress={() => handlePageChange(1)}
+                      disabled={currentPage === 1}
                     >
-                      <Text
-                        style={currentPage === page ? styles.pageButtonTextActive : styles.pageButtonText}
-                      >
-                        {page}
-                      </Text>
+                      <Feather name="chevrons-left" size={20} color={iconColor} />
                     </TouchableOpacity>
-                  )
-                )}
+                    <TouchableOpacity
+                      style={[styles.navButton, currentPage === 1 && styles.navButtonDisabled]}
+                      onPress={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <Feather name="chevron-left" size={20} color={iconColor} />
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.navButton, currentPage === totalPages && styles.navButtonDisabled]}
-                  onPress={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                >
-                  <Feather name="chevron-right" size={20} color={iconColor} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.navButton, currentPage === totalPages && styles.navButtonDisabled]}
-                  onPress={() => handlePageChange(totalPages)}
-                  disabled={currentPage === totalPages}
-                >
-                  <Feather name="chevrons-right" size={20} color={iconColor} />
-                </TouchableOpacity>
+                    {generatePageNumbers().map((page, index) =>
+                      page === '...' ? (
+                        <Text key={`ellipsis-${index}`} style={styles.ellipsisText}>
+                          ...
+                        </Text>
+                      ) : (
+                        <TouchableOpacity
+                          key={`page-${page}`}
+                          style={[styles.pageButton, currentPage === page && styles.pageButtonActive]}
+                          onPress={() => handlePageChange(page as number)}
+                        >
+                          <Text
+                            style={currentPage === page ? styles.pageButtonTextActive : styles.pageButtonText}
+                          >
+                            {page}
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    )}
+
+                    <TouchableOpacity
+                      style={[styles.navButton, currentPage === totalPages && styles.navButtonDisabled]}
+                      onPress={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <Feather name="chevron-right" size={20} color={iconColor} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.navButton, currentPage === totalPages && styles.navButtonDisabled]}
+                      onPress={() => handlePageChange(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <Feather name="chevrons-right" size={20} color={iconColor} />
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
               </View>
             )}
           </>
@@ -529,26 +533,7 @@ export default function NovelDetailsScreen() {
             <Text style={{ color: '#888' }}>No chapters found.</Text>
           </View>
         )}
-      </Animated.ScrollView>
-
-      {/* FAB - scroll to top */}
-      <Animated.View
-        style={[
-          styles.fabContainer,
-          {
-            opacity: fabOpacity,
-            transform: [{ translateY: fabTranslateY }],
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
-          activeOpacity={0.8}
-        >
-          <Feather name="arrow-up" size={24} color="#fff" />
-        </TouchableOpacity>
-      </Animated.View>
+      </ScrollView>
 
       {/* Jump Modal */}
       <Modal
