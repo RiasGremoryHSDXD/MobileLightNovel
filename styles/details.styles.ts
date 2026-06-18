@@ -154,7 +154,6 @@ export const styles = StyleSheet.create({
   },
   chapterTitle: {
     fontSize: 16,
-    flex: 1,
     marginRight: 10,
   },
   fabContainer: {
