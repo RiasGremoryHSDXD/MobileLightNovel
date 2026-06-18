@@ -15,7 +15,7 @@ export const styles = StyleSheet.create({
   },
   coverImage: {
     width: 100,
-    height: 150,
+    height: 90,
     borderRadius: 6,
     marginRight: 15,
   },
@@ -156,24 +156,7 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     marginRight: 10,
   },
-  fabContainer: {
-    position: 'absolute',
-    bottom: 70,
-    right: 20,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-  },
-  fab: {
-    backgroundColor: '#1E90FF',
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.7)',
@@ -252,5 +235,114 @@ export const styles = StyleSheet.create({
   },
   manageCatName: {
     fontSize: 15,
+  },
+  // --- Pagination Styles ---
+  paginationTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 144, 255, 0.06)',
+    marginHorizontal: 15,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    height: 44,
+    borderRadius: 10,
+  },
+  paginationInfoText: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: '500',
+  },
+  paginationJumpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    padding: 5,
+  },
+  paginationJumpText: {
+    color: '#1E90FF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  paginationBottomBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 15,
+    paddingBottom: 40,
+    paddingHorizontal: 10,
+    gap: 4,
+  },
+  pageButton: {
+    minWidth: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  pageButtonActive: {
+    backgroundColor: '#1E90FF',
+  },
+  pageButtonText: {
+    fontSize: 14,
+    color: '#888',
+  },
+  pageButtonTextActive: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  navButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  navButtonDisabled: {
+    opacity: 0.3,
+  },
+  ellipsisText: {
+    color: '#555',
+    marginHorizontal: 4,
+    fontSize: 16,
+  },
+  jumpModalInput: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    color: '#fff',
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlign: 'center',
+    marginVertical: 15,
+  },
+  jumpModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 15,
+    marginTop: 5,
+  },
+  jumpModalBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  jumpModalBtnPrimary: {
+    backgroundColor: '#1E90FF',
+  },
+  jumpModalBtnDisabled: {
+    backgroundColor: 'rgba(30, 144, 255, 0.3)',
+  },
+  jumpModalBtnText: {
+    color: '#888',
+    fontWeight: 'bold',
+  },
+  jumpModalBtnTextPrimary: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
