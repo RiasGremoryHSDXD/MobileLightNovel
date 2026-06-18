@@ -162,9 +162,11 @@ export const addToLibrary = (novel: any, sourceId: string, targetCategoryId?: nu
   let categoryId = targetCategoryId !== undefined ? targetCategoryId : 1;
   if (targetCategoryId === undefined) {
     try {
-      const existing = db.getFirstSync<{categoryId: number}>('SELECT categoryId FROM library WHERE novelUrl = ?', [url]);
-      if (existing && existing.categoryId) {
-        categoryId = existing.categoryId;
+      const statement = db.prepareSync('SELECT categoryId FROM library WHERE novelUrl = ?');
+      const result = statement.executeSync([url]);
+      const rows = result.getAllSync() as {categoryId: number}[];
+      if (rows && rows.length > 0 && rows[0].categoryId) {
+        categoryId = rows[0].categoryId;
       }
     } catch(e) {}
   }
@@ -280,17 +282,22 @@ export const addCategory = (name: string) => {
 };
 
 export const deleteCategory = (id: number) => {
-  // Prevent deleting system defaults
-  const cat = db.getFirstSync<{isSystemDefault: number}>('SELECT isSystemDefault FROM categories WHERE id = ?', [id]);
-  if (cat?.isSystemDefault === 1) return;
+  try {
+    // 1. Move all novels to Default category (id = 1) ONLY if the category to delete is NOT a system default
+    const moveStatement = db.prepareSync(`
+      UPDATE library 
+      SET categoryId = 1 
+      WHERE categoryId = ? 
+      AND (SELECT isSystemDefault FROM categories WHERE id = ?) = 0
+    `);
+    moveStatement.executeSync([id, id]);
 
-  // Move all novels to Default category (id = 1)
-  const moveStatement = db.prepareSync('UPDATE library SET categoryId = 1 WHERE categoryId = ?');
-  moveStatement.executeSync([id]);
-
-  // Delete category
-  const delStatement = db.prepareSync('DELETE FROM categories WHERE id = ?');
-  delStatement.executeSync([id]);
+    // 2. Delete the category ONLY if it is NOT a system default
+    const delStatement = db.prepareSync('DELETE FROM categories WHERE id = ? AND isSystemDefault = 0');
+    delStatement.executeSync([id]);
+  } catch (e) {
+    console.error('Error deleting category:', e);
+  }
 };
 
 export const updateCategoryOrder = (categories: {id: number, sortOrder: number}[]) => {
