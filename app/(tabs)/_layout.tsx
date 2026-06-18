@@ -1,11 +1,12 @@
 import Feather from '@expo/vector-icons/Feather';
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs, useFocusEffect } from 'expo-router';
+import React, { useState, useCallback } from 'react';
 
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 import { useColorScheme } from '@/components/useColorScheme';
 import Colors from '@/constants/Colors';
 import { TouchableOpacity } from 'react-native';
+import { getUnreadUpdatesCount } from '../../services/database/Database';
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
 function TabBarIcon(props: {
@@ -17,6 +18,13 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      setUnreadCount(getUnreadUpdatesCount());
+    }, [])
+  );
 
   return (
     <Tabs
@@ -43,8 +51,10 @@ export default function TabLayout() {
         options={{
           title: 'Updates',
           tabBarIcon: ({ color }) => <TabBarIcon name="bell" color={color} />,
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
         }}
       />
+
       <Tabs.Screen
         name="history"
         options={{

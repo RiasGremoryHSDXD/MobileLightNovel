@@ -13,7 +13,29 @@ export const initDB = () => {
       author TEXT,
       coverUrl TEXT,
       sourceId TEXT,
-      addedAt INTEGER
+      addedAt INTEGER,
+      totalChapters INTEGER DEFAULT 0
+    );
+  `);
+
+  try {
+    db.execSync('ALTER TABLE library ADD COLUMN totalChapters INTEGER DEFAULT 0;');
+  } catch (e) {
+    // Ignore if column already exists
+  }
+
+  // Create Updates table
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS updates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      novelUrl TEXT,
+      novelTitle TEXT,
+      novelCover TEXT,
+      chapterUrl TEXT UNIQUE, 
+      chapterTitle TEXT,
+      sourceId TEXT,
+      discoveredAt INTEGER,
+      isRead BOOLEAN DEFAULT 0
     );
   `);
 
@@ -101,12 +123,13 @@ export const getDatabaseSizeInBytes = (): number => {
 
 export const addToLibrary = (novel: any, sourceId: string) => {
   const statement = db.prepareSync(`
-    INSERT OR REPLACE INTO library (novelUrl, title, author, coverUrl, sourceId, addedAt)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT OR REPLACE INTO library (novelUrl, title, author, coverUrl, sourceId, addedAt, totalChapters)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
   // Handle both possible structures (novel.url or novel.novelUrl)
   const url = novel.url || novel.novelUrl;
-  statement.executeSync([url, novel.title, novel.author || '', novel.coverUrl || '', sourceId, Date.now()]);
+  const totalChapters = novel.chapters ? novel.chapters.length : 0;
+  statement.executeSync([url, novel.title, novel.author || '', novel.coverUrl || '', sourceId, Date.now(), totalChapters]);
 };
 
 export const removeFromLibrary = (novelUrl: string) => {
@@ -147,4 +170,51 @@ export const getLibrary = () => {
   const statement = db.prepareSync('SELECT * FROM library ORDER BY addedAt DESC');
   const result = statement.executeSync();
   return result.getAllSync();
+};
+
+export const updateLibraryTotalChapters = (novelUrl: string, totalChapters: number) => {
+  const statement = db.prepareSync('UPDATE library SET totalChapters = ? WHERE novelUrl = ?');
+  statement.executeSync([totalChapters, novelUrl]);
+};
+
+// --- Updates Functions ---
+
+export const getUpdates = () => {
+  const statement = db.prepareSync('SELECT * FROM updates ORDER BY discoveredAt DESC');
+  const result = statement.executeSync();
+  return result.getAllSync();
+};
+
+export const getUnreadUpdatesCount = (): number => {
+  try {
+    const statement = db.prepareSync('SELECT COUNT(*) as count FROM updates WHERE isRead = 0');
+    const result = statement.executeSync();
+    const rows = result.getAllSync();
+    if (rows.length > 0) return (rows[0] as any).count;
+  } catch(e) {
+    console.error(e);
+  }
+  return 0;
+};
+
+export const addUpdate = (novelUrl: string, novelTitle: string, novelCover: string, chapterUrl: string, chapterTitle: string, sourceId: string) => {
+  try {
+    const statement = db.prepareSync(`
+      INSERT INTO updates (novelUrl, novelTitle, novelCover, chapterUrl, chapterTitle, sourceId, discoveredAt, isRead)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+    `);
+    statement.executeSync([novelUrl, novelTitle, novelCover, chapterUrl, chapterTitle, sourceId, Date.now()]);
+  } catch(e) {
+    // Ignore error if chapterUrl already exists (UNIQUE constraint)
+  }
+};
+
+export const markUpdateAsRead = (chapterUrl: string) => {
+  const statement = db.prepareSync('UPDATE updates SET isRead = 1 WHERE chapterUrl = ?');
+  statement.executeSync([chapterUrl]);
+};
+
+export const clearUpdates = () => {
+  db.execSync('DELETE FROM updates;');
+  db.execSync('VACUUM;');
 };
