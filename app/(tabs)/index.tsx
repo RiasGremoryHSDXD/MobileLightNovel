@@ -1,10 +1,10 @@
-import { StyleSheet, FlatList, TouchableOpacity, RefreshControl, ScrollView, Modal, Pressable, View as RNView } from 'react-native';
+import { StyleSheet, FlatList, TouchableOpacity, RefreshControl, ScrollView, Modal, Pressable, View as RNView, TextInput } from 'react-native';
 import { Image } from 'expo-image';
 import { Text, View } from '@/components/Themed';
 import Feather from '@expo/vector-icons/Feather';
-import { useCallback, useState } from 'react';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { getLibrary, getCategories, changeNovelCategory, removeFromLibrary } from '../../services/database/Database';
+import { useCallback, useState, useEffect } from 'react';
+import { useFocusEffect, useRouter, useNavigation } from 'expo-router';
+import { getLibrary, getCategories, changeNovelCategory, removeFromLibrary, addCategory, deleteCategory } from '../../services/database/Database';
 
 export default function LibraryScreen() {
   const [library, setLibrary] = useState<any[]>([]);
@@ -16,7 +16,25 @@ export default function LibraryScreen() {
   const [selectedNovel, setSelectedNovel] = useState<any>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
+  // Manage Categories state
+  const [isManageModalVisible, setIsManageModalVisible] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
   const router = useRouter();
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity 
+          onPress={() => setIsManageModalVisible(true)} 
+          style={{ marginRight: 16, padding: 4 }}
+        >
+          <Feather name="settings" size={22} color="#1E90FF" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   const loadLibrary = async () => {
     try {
@@ -66,6 +84,18 @@ export default function LibraryScreen() {
       await loadLibrary();
     }
     closeNovelModal();
+  };
+
+  const handleAddCategory = async () => {
+    if (newCategoryName.trim().length === 0) return;
+    addCategory(newCategoryName.trim());
+    setNewCategoryName('');
+    await loadLibrary();
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    deleteCategory(id);
+    await loadLibrary();
   };
 
   const renderNovel = ({ item }: { item: any }) => (
@@ -169,6 +199,60 @@ export default function LibraryScreen() {
             
             <TouchableOpacity style={styles.cancelButton} onPress={closeNovelModal}>
               <Text style={styles.cancelButtonText} lightColor="#888" darkColor="#888">Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Manage Categories Modal */}
+      <Modal visible={isManageModalVisible} transparent={true} animationType="fade" onRequestClose={() => setIsManageModalVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setIsManageModalVisible(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <RNView style={styles.modalHeader}>
+              <Feather name="settings" size={20} color="#1E90FF" />
+              <Text style={styles.modalTitle} lightColor="#fff" darkColor="#fff">Manage Categories</Text>
+            </RNView>
+            <Text style={styles.modalSubtitle} lightColor="#999" darkColor="#999">Create or remove folders</Text>
+
+            <RNView style={styles.addCategoryContainer}>
+              <TextInput
+                style={styles.addCategoryInput}
+                placeholder="New category name..."
+                placeholderTextColor="#666"
+                value={newCategoryName}
+                onChangeText={setNewCategoryName}
+                onSubmitEditing={handleAddCategory}
+              />
+              <TouchableOpacity style={styles.addButton} onPress={handleAddCategory}>
+                <Feather name="plus" size={20} color="#fff" />
+              </TouchableOpacity>
+            </RNView>
+            
+            <ScrollView style={styles.modalCategoryList}>
+              {categories.map((cat) => (
+                <RNView key={cat.id} style={styles.manageCategoryRow}>
+                  <RNView style={styles.manageCategoryInfo}>
+                    <Feather name="folder" size={16} color={cat.isSystemDefault ? '#1E90FF' : '#888'} />
+                    <Text style={styles.modalCategoryText} lightColor="#ddd" darkColor="#ddd">{cat.name}</Text>
+                    {cat.isSystemDefault === 1 && (
+                      <RNView style={styles.systemBadge}>
+                        <Text style={styles.systemBadgeText}>System</Text>
+                      </RNView>
+                    )}
+                  </RNView>
+                  {cat.isSystemDefault === 0 ? (
+                    <TouchableOpacity onPress={() => handleDeleteCategory(cat.id)} style={styles.deleteCategoryButton}>
+                      <Feather name="trash" size={16} color="#FF3B30" />
+                    </TouchableOpacity>
+                  ) : (
+                    <Feather name="lock" size={14} color="#444" style={{ padding: 8 }} />
+                  )}
+                </RNView>
+              ))}
+            </ScrollView>
+            
+            <TouchableOpacity style={styles.cancelButton} onPress={() => setIsManageModalVisible(false)}>
+              <Text style={styles.cancelButtonText} lightColor="#888" darkColor="#888">Close</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -326,5 +410,60 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: 15,
+  },
+  addCategoryContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  addCategoryInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    color: '#fff',
+    marginRight: 10,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  addButton: {
+    backgroundColor: '#1E90FF',
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  manageCategoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+  },
+  manageCategoryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  systemBadge: {
+    backgroundColor: 'rgba(30,144,255,0.15)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 4,
+  },
+  systemBadgeText: {
+    fontSize: 10,
+    color: '#1E90FF',
+    fontWeight: '600',
+  },
+  deleteCategoryButton: {
+    padding: 8,
   },
 });
