@@ -1,13 +1,13 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { ActivityIndicator, Animated, FlatList, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, useColorScheme } from 'react-native';
+import { ActivityIndicator, Animated, FlatList, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, useColorScheme, Modal, Pressable, View as RNView } from 'react-native';
 import { Image } from 'expo-image';
 
 import { Text, View } from '@/components/Themed';
 // @ts-ignore
 import { ExtensionManager } from '../../services/extensions/ExtensionManager';
-import { initDB, addToLibrary, removeFromLibrary, isInLibrary, getCache, setCache, getDownloadedChapterUrls } from '../../services/database/Database';
+import { initDB, addToLibrary, removeFromLibrary, isInLibrary, getCache, setCache, getDownloadedChapterUrls, getCategories } from '../../services/database/Database';
 
 const ChapterCard = React.memo(({ item, onPress, isDownloaded, isDownloading, onDownload }: any) => (
   <View style={styles.chapterCard}>
@@ -43,6 +43,9 @@ export default function NovelDetailsScreen() {
   const [isSaved, setIsSaved] = useState(false);
   const [downloadedChapters, setDownloadedChapters] = useState<Set<string>>(new Set());
   const [downloadingChapters, setDownloadingChapters] = useState<Set<string>>(new Set());
+  const [categories, setCategories] = useState<any[]>([]);
+  const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
+  
   const flatListRef = useRef<FlatList>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -59,7 +62,10 @@ export default function NovelDetailsScreen() {
   });
 
   useEffect(() => {
-    try { initDB(); } catch (e) { console.error(e); }
+    try { 
+      initDB(); 
+      setCategories(getCategories());
+    } catch (e) { console.error(e); }
   }, []);
 
   useEffect(() => {
@@ -102,9 +108,16 @@ export default function NovelDetailsScreen() {
       removeFromLibrary(decodedUrl);
       setIsSaved(false);
     } else {
-      addToLibrary({ ...novel, url: decodedUrl }, sourceId as string);
-      setIsSaved(true);
+      setIsCategoryModalVisible(true);
     }
+  };
+
+  const handleSaveToCategory = (categoryId: number) => {
+    if (!novel || !url) return;
+    const decodedUrl = decodeURIComponent(url as string);
+    addToLibrary({ ...novel, url: decodedUrl }, sourceId as string, categoryId);
+    setIsSaved(true);
+    setIsCategoryModalVisible(false);
   };
 
   const openChapter = useCallback((chapterUrl: string, chapterTitle: string) => {
@@ -338,6 +351,37 @@ export default function NovelDetailsScreen() {
           <Feather name="arrow-up" size={24} color="#fff" />
         </TouchableOpacity>
       </Animated.View>
+
+      {/* Category Selection Modal */}
+      <Modal visible={isCategoryModalVisible} transparent={true} animationType="fade" onRequestClose={() => setIsCategoryModalVisible(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setIsCategoryModalVisible(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <RNView style={styles.modalHeader}>
+              <Feather name="bookmark" size={20} color="#1E90FF" />
+              <Text style={styles.modalTitle} lightColor="#fff" darkColor="#fff">Save to Category</Text>
+            </RNView>
+            <Text style={styles.modalSubtitleText} lightColor="#999" darkColor="#999">Choose a folder for this novel:</Text>
+            <ScrollView style={styles.modalCategoryList}>
+              {categories.map((cat) => (
+                <TouchableOpacity 
+                  key={cat.id} 
+                  style={styles.modalCategoryRow}
+                  onPress={() => handleSaveToCategory(cat.id)}
+                >
+                  <RNView style={styles.modalCategoryRowInner}>
+                    <Feather name="folder" size={16} color="#1E90FF" />
+                    <Text style={styles.modalCategoryText} lightColor="#ddd" darkColor="#ddd">{cat.name}</Text>
+                  </RNView>
+                  <Feather name="chevron-right" size={16} color="#555" />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity style={styles.cancelButton} onPress={() => setIsCategoryModalVisible(false)}>
+              <Text style={styles.cancelButtonText} lightColor="#888" darkColor="#888">Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -516,5 +560,62 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '85%',
+    backgroundColor: '#1C1C1E',
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+  },
+  modalSubtitleText: {
+    fontSize: 13,
+    marginBottom: 12,
+    marginLeft: 28,
+  },
+  modalCategoryList: {
+    maxHeight: 250,
+  },
+  modalCategoryRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalCategoryRowInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  modalCategoryText: {
+    fontSize: 15,
+  },
+  cancelButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 15,
   },
 });
