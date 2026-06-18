@@ -61,6 +61,39 @@ export const initDB = () => {
       lastReadAt INTEGER
     );
   `);
+
+  // Create Categories table
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      sortOrder INTEGER DEFAULT 0,
+      isSystemDefault BOOLEAN DEFAULT 0
+    );
+  `);
+
+  // Populate default categories if empty
+  const categoryCount = db.getFirstSync<{count: number}>('SELECT COUNT(*) as count FROM categories;');
+  if (categoryCount && categoryCount.count === 0) {
+    const defaultCategories = [
+      { name: 'Default', isSystem: 1 },
+      { name: 'Currently Reading', isSystem: 1 },
+      { name: 'Completed', isSystem: 1 },
+      { name: 'Plan to Read', isSystem: 1 },
+      { name: 'Dropped', isSystem: 1 }
+    ];
+    
+    defaultCategories.forEach((cat, index) => {
+      db.execSync(`INSERT INTO categories (name, sortOrder, isSystemDefault) VALUES ('${cat.name}', ${index}, ${cat.isSystem})`);
+    });
+  }
+
+  // Add categoryId to library table
+  try {
+    db.execSync('ALTER TABLE library ADD COLUMN categoryId INTEGER DEFAULT 1;');
+  } catch (e) {
+    // Ignore if column already exists
+  }
 };
 
 // Ensure tables are always created instantly on app startup
@@ -121,15 +154,27 @@ export const getDatabaseSizeInBytes = (): number => {
 
 // --- Library Functions ---
 
-export const addToLibrary = (novel: any, sourceId: string) => {
-  const statement = db.prepareSync(`
-    INSERT OR REPLACE INTO library (novelUrl, title, author, coverUrl, sourceId, addedAt, totalChapters)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
+export const addToLibrary = (novel: any, sourceId: string, targetCategoryId?: number) => {
   // Handle both possible structures (novel.url or novel.novelUrl)
   const url = novel.url || novel.novelUrl;
+  
+  // Try to preserve existing categoryId if it's already in the library
+  let categoryId = targetCategoryId !== undefined ? targetCategoryId : 1;
+  if (targetCategoryId === undefined) {
+    try {
+      const existing = db.getFirstSync<{categoryId: number}>('SELECT categoryId FROM library WHERE novelUrl = ?', [url]);
+      if (existing && existing.categoryId) {
+        categoryId = existing.categoryId;
+      }
+    } catch(e) {}
+  }
+
+  const statement = db.prepareSync(`
+    INSERT OR REPLACE INTO library (novelUrl, title, author, coverUrl, sourceId, addedAt, totalChapters, categoryId)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `);
   const totalChapters = novel.chapters ? novel.chapters.length : 0;
-  statement.executeSync([url, novel.title, novel.author || '', novel.coverUrl || '', sourceId, Date.now(), totalChapters]);
+  statement.executeSync([url, novel.title, novel.author || '', novel.coverUrl || '', sourceId, Date.now(), totalChapters, categoryId]);
 };
 
 export const removeFromLibrary = (novelUrl: string) => {
@@ -217,4 +262,50 @@ export const markUpdateAsRead = (chapterUrl: string) => {
 export const clearUpdates = () => {
   db.execSync('DELETE FROM updates;');
   db.execSync('VACUUM;');
+};
+
+// --- Category Functions ---
+
+export const getCategories = () => {
+  const statement = db.prepareSync('SELECT * FROM categories ORDER BY sortOrder ASC');
+  const result = statement.executeSync();
+  return result.getAllSync();
+};
+
+export const addCategory = (name: string) => {
+  const result = db.getFirstSync<{maxSort: number}>('SELECT MAX(sortOrder) as maxSort FROM categories');
+  const nextSort = (result?.maxSort || 0) + 1;
+  const statement = db.prepareSync('INSERT INTO categories (name, sortOrder, isSystemDefault) VALUES (?, ?, 0)');
+  statement.executeSync([name, nextSort]);
+};
+
+export const deleteCategory = (id: number) => {
+  // Prevent deleting system defaults
+  const cat = db.getFirstSync<{isSystemDefault: number}>('SELECT isSystemDefault FROM categories WHERE id = ?', [id]);
+  if (cat?.isSystemDefault === 1) return;
+
+  // Move all novels to Default category (id = 1)
+  const moveStatement = db.prepareSync('UPDATE library SET categoryId = 1 WHERE categoryId = ?');
+  moveStatement.executeSync([id]);
+
+  // Delete category
+  const delStatement = db.prepareSync('DELETE FROM categories WHERE id = ?');
+  delStatement.executeSync([id]);
+};
+
+export const updateCategoryOrder = (categories: {id: number, sortOrder: number}[]) => {
+  const statement = db.prepareSync('UPDATE categories SET sortOrder = ? WHERE id = ?');
+  for (const cat of categories) {
+    statement.executeSync([cat.sortOrder, cat.id]);
+  }
+};
+
+export const renameCategory = (id: number, newName: string) => {
+  const statement = db.prepareSync('UPDATE categories SET name = ? WHERE id = ? AND isSystemDefault = 0');
+  statement.executeSync([newName, id]);
+};
+
+export const changeNovelCategory = (novelUrl: string, categoryId: number) => {
+  const statement = db.prepareSync('UPDATE library SET categoryId = ? WHERE novelUrl = ?');
+  statement.executeSync([categoryId, novelUrl]);
 };
