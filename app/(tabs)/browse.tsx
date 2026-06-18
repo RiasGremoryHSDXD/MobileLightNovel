@@ -1,6 +1,6 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Tabs, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { FlatList, StyleSheet, TextInput, TouchableOpacity, useColorScheme } from 'react-native';
 
 import { Text, View } from '@/components/Themed';
@@ -15,16 +15,29 @@ export default function BrowseScreen() {
   const iconColor = colorScheme === 'dark' ? '#fff' : '#000';
   const router = useRouter();
 
-  const [searchQuery, setSearchQuery] = useState('');
+  // Ref holds the live text — typing never triggers a re-render
+  const searchRef = useRef('');
+  // filterText drives the actual list filtering; updated from ref
+  const [filterText, setFilterText] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [activeTab, setActiveTab] = useState('Sources');
 
-  // Filter extensions based on the search bar
+  // Filter extensions based on filterText state
   const filteredExtensions = AVAILABLE_EXTENSIONS.filter(ext => 
-    ext.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ext.name.toLowerCase().includes(filterText.toLowerCase())
   );
   
   const installedExtensions = AVAILABLE_EXTENSIONS.filter(ext => ext.installed);
+
+  const closeSearch = useCallback(() => {
+    searchRef.current = '';
+    setFilterText('');
+    setShowSearch(false);
+  }, []);
+
+  const openSearch = useCallback(() => {
+    setShowSearch(true);
+  }, []);
 
   const renderSource = ({ item }: { item: any }) => (
     <TouchableOpacity 
@@ -62,7 +75,7 @@ export default function BrowseScreen() {
         options={{
           headerLeft: showSearch
             ? () => (
-              <TouchableOpacity onPress={() => setShowSearch(false)} style={{ marginLeft: 15 }}>
+              <TouchableOpacity onPress={closeSearch} style={{ marginLeft: 15 }}>
                 <Feather name="arrow-left" size={24} color={iconColor} />
               </TouchableOpacity>
             )
@@ -73,8 +86,11 @@ export default function BrowseScreen() {
                 style={{ fontSize: 18, color: iconColor, flex: 1, minWidth: 250 }}
                 placeholder="Search extensions..."
                 placeholderTextColor="#888"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
+                defaultValue=""
+                onChangeText={(text) => {
+                  searchRef.current = text;
+                  setFilterText(text);
+                }}
                 autoFocus
               />
             )
@@ -86,7 +102,7 @@ export default function BrowseScreen() {
               </TouchableOpacity>
             )
             : () => (
-              <TouchableOpacity onPress={() => setShowSearch(true)} style={{ marginRight: 15 }}>
+              <TouchableOpacity onPress={openSearch} style={{ marginRight: 15 }}>
                 <Feather name="search" size={24} color={iconColor} />
               </TouchableOpacity>
             )
