@@ -25,7 +25,8 @@ export const checkForUpdates = async (): Promise<number> => {
         // We shouldn't spam the user with thousands of old chapters. 
         // We just update the totalChapters silently.
         if (previousTotal > 0) {
-          const newChapters = details.chapters.slice(previousTotal, currentTotal);
+          const newChaptersCount = currentTotal - previousTotal;
+          const newChapters = details.chapters.slice(0, newChaptersCount);
           
           for (const chapter of newChapters) {
             addUpdate(
