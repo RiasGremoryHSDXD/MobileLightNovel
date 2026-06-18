@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { DeviceEventEmitter } from 'react-native';
 
 // Open the local database synchronously
 const db = SQLite.openDatabaseSync('lightnovel.db');
@@ -251,6 +252,7 @@ export const addUpdate = (novelUrl: string, novelTitle: string, novelCover: stri
       VALUES (?, ?, ?, ?, ?, ?, ?, 0)
     `);
     statement.executeSync([novelUrl, novelTitle, novelCover, chapterUrl, chapterTitle, sourceId, Date.now()]);
+    DeviceEventEmitter.emit('updatesChanged');
   } catch(e) {
     // Ignore error if chapterUrl already exists (UNIQUE constraint)
   }
@@ -259,11 +261,13 @@ export const addUpdate = (novelUrl: string, novelTitle: string, novelCover: stri
 export const markUpdateAsRead = (chapterUrl: string) => {
   const statement = db.prepareSync('UPDATE updates SET isRead = 1 WHERE chapterUrl = ?');
   statement.executeSync([chapterUrl]);
+  DeviceEventEmitter.emit('updatesChanged');
 };
 
 export const clearUpdates = () => {
   db.execSync('DELETE FROM updates;');
   db.execSync('VACUUM;');
+  DeviceEventEmitter.emit('updatesChanged');
 };
 
 // --- Category Functions ---
