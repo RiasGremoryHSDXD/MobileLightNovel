@@ -253,4 +253,113 @@ export const styles = StyleSheet.create({
   manageCatName: {
     fontSize: 15,
   },
+  // --- Pagination Styles ---
+  paginationTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 144, 255, 0.06)',
+    marginHorizontal: 15,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    height: 44,
+    borderRadius: 10,
+  },
+  paginationInfoText: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: '500',
+  },
+  paginationJumpButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    padding: 5,
+  },
+  paginationJumpText: {
+    color: '#1E90FF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  paginationBottomBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  pageButton: {
+    minWidth: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  pageButtonActive: {
+    backgroundColor: '#1E90FF',
+  },
+  pageButtonText: {
+    fontSize: 15,
+    color: '#888',
+  },
+  pageButtonTextActive: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  navButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  navButtonDisabled: {
+    opacity: 0.3,
+  },
+  ellipsisText: {
+    color: '#555',
+    marginHorizontal: 4,
+    fontSize: 16,
+  },
+  jumpModalInput: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    color: '#fff',
+    fontSize: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    textAlign: 'center',
+    marginVertical: 15,
+  },
+  jumpModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 15,
+    marginTop: 5,
+  },
+  jumpModalBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  jumpModalBtnPrimary: {
+    backgroundColor: '#1E90FF',
+  },
+  jumpModalBtnDisabled: {
+    backgroundColor: 'rgba(30, 144, 255, 0.3)',
+  },
+  jumpModalBtnText: {
+    color: '#888',
+    fontWeight: 'bold',
+  },
+  jumpModalBtnTextPrimary: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
 });

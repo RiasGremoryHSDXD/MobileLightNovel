@@ -1,34 +1,78 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
-import { ActivityIndicator, Animated, FlatList, StyleSheet, TouchableOpacity, TextInput, Alert, ScrollView, useColorScheme, Modal, Pressable, View as RNView } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  ScrollView,
+  useColorScheme,
+  Modal,
+  Pressable,
+  View as RNView,
+} from 'react-native';
 import { Image } from 'expo-image';
 
 import { Text, View } from '@/components/Themed';
 // @ts-ignore
 import { ExtensionManager } from '../../services/extensions/ExtensionManager';
-import { initDB, addToLibrary, removeFromLibrary, isInLibrary, getCache, setCache, getDownloadedChapterUrls, getCategories } from '../../services/database/Database';
+import {
+  initDB,
+  addToLibrary,
+  removeFromLibrary,
+  isInLibrary,
+  getCache,
+  setCache,
+  getDownloadedChapterUrls,
+  getCategories,
+} from '../../services/database/Database';
 import { styles } from '../../styles/details.styles';
 
-const ChapterCard = React.memo(({ item, onPress, isDownloaded, isDownloading, onDownload }: any) => (
-  <View style={styles.chapterCard}>
-    <TouchableOpacity
-      style={styles.chapterClickableArea}
-      onPress={() => onPress(item.url, item.title)}
-    >
-      <Text style={styles.chapterTitle} numberOfLines={1}>{item.title}</Text>
-    </TouchableOpacity>
-    {isDownloaded ? (
-      <Feather name="check-circle" size={20} color="#1E90FF" style={{ padding: 5 }} />
-    ) : isDownloading ? (
-      <View style={{ padding: 5 }}><ActivityIndicator size="small" color="#1E90FF" /></View>
-    ) : (
-      <TouchableOpacity onPress={() => onDownload(item.url)} style={{ padding: 5 }}>
-        <Feather name="download" size={20} color="#888" />
-      </TouchableOpacity>
-    )}
-  </View>
-));
+const CHAPTERS_PER_PAGE = 50;
+
+const ChapterCard = React.memo(
+  ({ item, onPress, downloadedChapters, downloadingChapters, onDownload }: any) => {
+    const isDownloaded = downloadedChapters.has(`chapter_${item.url}`);
+    const isDownloading = downloadingChapters.has(item.url);
+    return (
+      <View style={styles.chapterCard}>
+        <TouchableOpacity
+          style={styles.chapterClickableArea}
+          onPress={() => onPress(item.url, item.title)}
+        >
+          <Text style={styles.chapterTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+        </TouchableOpacity>
+        {isDownloaded ? (
+          <Feather name="check-circle" size={20} color="#1E90FF" style={{ padding: 5 }} />
+        ) : isDownloading ? (
+          <View style={{ padding: 5 }}>
+            <ActivityIndicator size="small" color="#1E90FF" />
+          </View>
+        ) : (
+          <TouchableOpacity onPress={() => onDownload(item.url)} style={{ padding: 5 }}>
+            <Feather name="download" size={20} color="#888" />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  },
+  (prev, next) => {
+    const prevDownloaded = prev.downloadedChapters.has(`chapter_${prev.item.url}`);
+    const nextDownloaded = next.downloadedChapters.has(`chapter_${next.item.url}`);
+    const prevDownloading = prev.downloadingChapters.has(prev.item.url);
+    const nextDownloading = next.downloadingChapters.has(next.item.url);
+    return (
+      prev.item.url === next.item.url &&
+      prevDownloaded === nextDownloaded &&
+      prevDownloading === nextDownloading
+    );
+  }
+);
 
 export default function NovelDetailsScreen() {
   const { url, sourceId } = useLocalSearchParams();
@@ -46,8 +90,15 @@ export default function NovelDetailsScreen() {
   const [downloadingChapters, setDownloadingChapters] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<any[]>([]);
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
-  
-  const flatListRef = useRef<FlatList>(null);
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isJumpModalVisible, setIsJumpModalVisible] = useState(false);
+  const [jumpPageInput, setJumpPageInput] = useState('');
+
+  // Refs
+  const scrollViewRef = useRef<ScrollView>(null);
+  const chapterListLayoutY = useRef(0);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const fabOpacity = scrollY.interpolate({
@@ -63,17 +114,19 @@ export default function NovelDetailsScreen() {
   });
 
   useEffect(() => {
-    try { 
-      initDB(); 
+    try {
+      initDB();
       setCategories(getCategories());
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
   }, []);
 
   useEffect(() => {
     async function loadNovel() {
       const extension = ExtensionManager.getExtension(sourceId as string);
       const decodedUrl = decodeURIComponent(url as string);
-      
+
       const cacheKey = `novel_details_${decodedUrl}`;
       const cached = getCache(cacheKey);
       if (cached) {
@@ -86,15 +139,15 @@ export default function NovelDetailsScreen() {
           const details = await extension.getNovelDetails(decodedUrl);
           setNovel(details);
           setCache(cacheKey, details);
-          
+
           setIsSaved(isInLibrary(decodedUrl));
 
           if (details?.chapters) {
             const urls = details.chapters.map((c: any) => `chapter_${c.url}`);
             setDownloadedChapters(getDownloadedChapterUrls(urls));
           }
-        } catch(e) {
-          console.error("Fetch or DB check error", e);
+        } catch (e) {
+          console.error('Fetch or DB check error', e);
         }
       }
       setLoading(false);
@@ -121,66 +174,113 @@ export default function NovelDetailsScreen() {
     setIsCategoryModalVisible(false);
   };
 
-  const openChapter = useCallback((chapterUrl: string, chapterTitle: string) => {
-    router.push(`/novel/reader?url=${encodeURIComponent(chapterUrl)}&title=${encodeURIComponent(chapterTitle)}&sourceId=${sourceId}&totalChapters=${novel?.chapters?.length || 0}&novelUrl=${encodeURIComponent(url as string)}&novelTitle=${encodeURIComponent(novel?.title || '')}&novelCover=${encodeURIComponent(novel?.coverUrl || '')}` as any);
-  }, [router, sourceId, novel, url]);
+  const openChapter = useCallback(
+    (chapterUrl: string, chapterTitle: string) => {
+      router.push(
+        `/novel/reader?url=${encodeURIComponent(chapterUrl)}&title=${encodeURIComponent(chapterTitle)}&sourceId=${sourceId}&totalChapters=${novel?.chapters?.length || 0}&novelUrl=${encodeURIComponent(url as string)}&novelTitle=${encodeURIComponent(novel?.title || '')}&novelCover=${encodeURIComponent(novel?.coverUrl || '')}` as any
+      );
+    },
+    [router, sourceId, novel, url]
+  );
 
-  const downloadChapter = useCallback(async (chapterUrl: string) => {
-    setDownloadingChapters(prev => new Set(prev).add(chapterUrl));
-    try {
-      const extension = ExtensionManager.getExtension(sourceId as string);
-      if (extension) {
-        const text = await extension.getChapterContent(chapterUrl);
-        setCache(`chapter_${chapterUrl}`, text);
-        setDownloadedChapters(prev => new Set(prev).add(`chapter_${chapterUrl}`));
+  const downloadChapter = useCallback(
+    async (chapterUrl: string) => {
+      setDownloadingChapters((prev) => new Set(prev).add(chapterUrl));
+      try {
+        const extension = ExtensionManager.getExtension(sourceId as string);
+        if (extension) {
+          const text = await extension.getChapterContent(chapterUrl);
+          setCache(`chapter_${chapterUrl}`, text);
+          setDownloadedChapters((prev) => new Set(prev).add(`chapter_${chapterUrl}`));
+        }
+      } catch (e) {
+        console.error(e);
+        Alert.alert('Error', 'Failed to download chapter.');
+      } finally {
+        setDownloadingChapters((prev) => {
+          const next = new Set(prev);
+          next.delete(chapterUrl);
+          return next;
+        });
       }
-    } catch (e) {
-      console.error(e);
-      Alert.alert("Error", "Failed to download chapter.");
-    } finally {
-      setDownloadingChapters(prev => {
-        const next = new Set(prev);
-        next.delete(chapterUrl);
-        return next;
-      });
-    }
-  }, [sourceId]);
-
-  const renderChapter = useCallback(({ item }: { item: any }) => (
-    <ChapterCard 
-      item={item} 
-      onPress={openChapter}
-      isDownloaded={downloadedChapters.has(`chapter_${item.url}`)}
-      isDownloading={downloadingChapters.has(item.url)}
-      onDownload={downloadChapter}
-    />
-  ), [openChapter, downloadedChapters, downloadingChapters, downloadChapter]);
-
-  const getItemLayout = useCallback((data: any, index: number) => (
-    { length: 55, offset: 55 * index, index }
-  ), []);
+    },
+    [sourceId]
+  );
 
   const filteredChapters = useMemo(() => {
     if (!novel?.chapters) return [];
     let list = [...novel.chapters];
-    
-    // NovelFire returns newest first (descending). Reverse it if asc is selected.
+
     if (sortOrder === 'asc') {
       list.reverse();
     }
-    
+
     if (!searchQuery) return list;
-    
+
     const query = searchQuery.trim().toLowerCase();
-    
-    // If query is just a number, do an exact number match
+
     if (/^\d+$/.test(query)) {
       const regex = new RegExp(`\\b${query}\\b`);
-      return list.filter(c => regex.test(c.title.toLowerCase()));
+      return list.filter((c) => regex.test(c.title.toLowerCase()));
     }
-    
-    return list.filter(c => c.title.toLowerCase().includes(query));
+
+    return list.filter((c) => c.title.toLowerCase().includes(query));
   }, [novel?.chapters, searchQuery, sortOrder]);
+
+  // Reset pagination when search or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredChapters.length / CHAPTERS_PER_PAGE));
+  
+  // Ensure currentPage is valid (e.g. if filtered chapters length drops)
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const startIndex = (currentPage - 1) * CHAPTERS_PER_PAGE;
+  const endIndex = startIndex + CHAPTERS_PER_PAGE;
+  const paginatedChapters = filteredChapters.slice(startIndex, endIndex);
+
+  const scrollToChapterList = () => {
+    if (scrollViewRef.current && chapterListLayoutY.current > 0) {
+      scrollViewRef.current.scrollTo({ y: chapterListLayoutY.current, animated: false });
+    }
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages || page === currentPage) return;
+    setCurrentPage(page);
+    scrollToChapterList();
+  };
+
+  const handleJumpSubmit = () => {
+    const pageNum = parseInt(jumpPageInput, 10);
+    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+      handlePageChange(pageNum);
+      setIsJumpModalVisible(false);
+      setJumpPageInput('');
+    }
+  };
+
+  const generatePageNumbers = () => {
+    const pages = [];
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, '...', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+      }
+    }
+    return pages;
+  };
 
   if (loading) {
     return (
@@ -200,193 +300,353 @@ export default function NovelDetailsScreen() {
     );
   }
 
-
-
   const handleDownload = () => {
     Alert.alert('Download', 'Downloading all chapters to local storage for offline reading...', [
-      { text: "Cancel", style: "cancel" },
-      { text: "Download", onPress: () => Alert.alert("Success", "Download started in background.") }
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Download', onPress: () => Alert.alert('Success', 'Download started in background.') },
     ]);
   };
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
-        options={{ 
-          title: novel.title, 
+      <Stack.Screen
+        options={{
+          title: novel.title,
           headerBackTitle: 'Back',
           headerRight: () => (
             <TouchableOpacity onPress={handleDownload} style={{ padding: 5, marginRight: -5 }}>
               <Feather name="download" size={22} color={iconColor} />
             </TouchableOpacity>
-          )
-        }} 
+          ),
+        }}
       />
 
-      <Animated.FlatList
-        ref={flatListRef}
-        data={filteredChapters}
-        keyExtractor={(item: any) => item.url}
-        renderItem={renderChapter}
-        getItemLayout={getItemLayout}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
+      <Animated.ScrollView
+        ref={scrollViewRef as any}
+        showsVerticalScrollIndicator={false}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: true,
+        })}
         scrollEventThrottle={16}
-        initialNumToRender={15}
-        maxToRenderPerBatch={20}
-        windowSize={10}
-        removeClippedSubviews={true}
-        ListHeaderComponent={
-          <View>
-            <View style={styles.headerBlock}>
-              <Image 
-                source={novel.coverUrl} 
-                style={styles.coverImage} 
-                contentFit="cover"
-                cachePolicy="disk"
-              />
-              <View style={styles.infoBlock}>
-                <Text style={styles.novelTitle} numberOfLines={3}>{novel.title}</Text>
-                <Text style={styles.novelAuthor}>{novel.author}</Text>
-
-                <View style={styles.actionRow}>
-                  <TouchableOpacity 
-                    style={[styles.actionButton, isSaved && { backgroundColor: '#1E90FF' }]} 
-                    onPress={toggleLibrary}
-                  >
-                    <Feather name="bookmark" size={20} color={isSaved ? '#fff' : '#1E90FF'} />
-                    <Text style={[styles.actionButtonText, isSaved && { color: '#fff' }]}>
-                      {isSaved ? "Saved to Library" : "Add to Library"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.readButtonContainer}>
-              <TouchableOpacity
-                style={styles.readButton}
-                onPress={() => {
-                  if (novel.chapters.length > 0) {
-                    const firstChapter = novel.chapters[novel.chapters.length - 1]; // Array is reversed (newest first), so last is chapter 1
-                    openChapter(firstChapter.url, firstChapter.title);
-                  }
-                }}
-              >
-                <Feather name="play" size={20} color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.readButtonText}>Start Reading</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.summaryBlock}>
-              <Text style={styles.summaryTitle}>About</Text>
-              <TouchableOpacity onPress={() => setIsSummaryExpanded(!isSummaryExpanded)}>
-                <Text style={styles.summaryText} numberOfLines={isSummaryExpanded ? undefined : 4}>
-                  {novel.summary}
-                </Text>
-                <Text style={{ color: '#1E90FF', marginTop: 8, fontWeight: 'bold' }}>
-                  {isSummaryExpanded ? 'Show less' : 'Show more'}
-                </Text>
-              </TouchableOpacity>
-
-              {novel.genres && novel.genres.length > 0 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 15, flexDirection: 'row' }}>
-                  {novel.genres.map((genre: string, idx: number) => (
-                    <View key={idx} style={styles.genreTag}>
-                      <Text style={styles.genreText}>{genre}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
-              )}
-            </View>
-
-            <View style={styles.chaptersHeader}>
-              <Text style={styles.chaptersTitle}>
-                {novel.chapters.length} Chapters
+        contentContainerStyle={{ paddingBottom: 20 }}
+      >
+        <View>
+          <View style={styles.headerBlock}>
+            <Image
+              source={novel.coverUrl}
+              style={styles.coverImage}
+              contentFit="cover"
+              cachePolicy="disk"
+            />
+            <View style={styles.infoBlock}>
+              <Text style={styles.novelTitle} numberOfLines={3}>
+                {novel.title}
               </Text>
-              <TouchableOpacity onPress={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')} style={styles.sortButton}>
-                <Feather name={sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'} size={18} color="#1E90FF" />
-                <Text style={styles.sortText}>{sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}</Text>
-              </TouchableOpacity>
-            </View>
+              <Text style={styles.novelAuthor}>{novel.author}</Text>
 
-            <View style={{ paddingHorizontal: 15, paddingBottom: 15 }}>
-              <View style={styles.searchContainer}>
-                <Feather name="search" size={18} color="#888" style={{ marginRight: 8 }} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search chapter... (e.g. 2000)"
-                  placeholderTextColor="#888"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  keyboardType="numeric"
-                />
-                {searchQuery.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <Feather name="x-circle" size={18} color="#888" />
-                  </TouchableOpacity>
-                )}
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[styles.actionButton, isSaved && { backgroundColor: '#1E90FF' }]}
+                  onPress={toggleLibrary}
+                >
+                  <Feather name="bookmark" size={20} color={isSaved ? '#fff' : '#1E90FF'} />
+                  <Text style={[styles.actionButtonText, isSaved && { color: '#fff' }]}>
+                    {isSaved ? 'Saved to Library' : 'Add to Library'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
-        }
-      />
 
+          <View style={styles.readButtonContainer}>
+            <TouchableOpacity
+              style={styles.readButton}
+              onPress={() => {
+                if (novel.chapters.length > 0) {
+                  const firstChapter = novel.chapters[novel.chapters.length - 1];
+                  openChapter(firstChapter.url, firstChapter.title);
+                }
+              }}
+            >
+              <Feather name="play" size={20} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.readButtonText}>Start Reading</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.summaryBlock}>
+            <Text style={styles.summaryTitle}>About</Text>
+            <TouchableOpacity onPress={() => setIsSummaryExpanded(!isSummaryExpanded)}>
+              <Text style={styles.summaryText} numberOfLines={isSummaryExpanded ? undefined : 4}>
+                {novel.summary}
+              </Text>
+              <Text style={{ color: '#1E90FF', marginTop: 8, fontWeight: 'bold' }}>
+                {isSummaryExpanded ? 'Show less' : 'Show more'}
+              </Text>
+            </TouchableOpacity>
+
+            {novel.genres && novel.genres.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={{ marginTop: 15, flexDirection: 'row' }}
+              >
+                {novel.genres.map((genre: string, idx: number) => (
+                  <View key={idx} style={styles.genreTag}>
+                    <Text style={styles.genreText}>{genre}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+
+          <View style={styles.chaptersHeader}>
+            <Text style={styles.chaptersTitle}>{novel.chapters.length} Chapters</Text>
+            <TouchableOpacity
+              onPress={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
+              style={styles.sortButton}
+            >
+              <Feather
+                name={sortOrder === 'desc' ? 'arrow-down' : 'arrow-up'}
+                size={18}
+                color="#1E90FF"
+              />
+              <Text style={styles.sortText}>
+                {sortOrder === 'desc' ? 'Newest First' : 'Oldest First'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ paddingHorizontal: 15, paddingBottom: 15 }}>
+            <View style={styles.searchContainer}>
+              <Feather name="search" size={18} color="#888" style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search chapter... (e.g. 2000)"
+                placeholderTextColor="#888"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                keyboardType="numeric"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Feather name="x-circle" size={18} color="#888" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Anchor point for scrolling to chapter list */}
+        <View onLayout={(e) => (chapterListLayoutY.current = e.nativeEvent.layout.y)} />
+
+        {/* Top Pagination Bar */}
+        {filteredChapters.length > 0 ? (
+          <>
+            {totalPages > 1 && (
+              <View style={styles.paginationTopBar}>
+                <Text style={styles.paginationInfoText}>
+                  Page {currentPage} of {totalPages}
+                </Text>
+                <TouchableOpacity
+                  style={styles.paginationJumpButton}
+                  onPress={() => setIsJumpModalVisible(true)}
+                >
+                  <Text style={styles.paginationJumpText}>Jump to page</Text>
+                  <Feather name="chevron-right" size={16} color="#1E90FF" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Chapter List */}
+            {paginatedChapters.map((item: any) => (
+              <ChapterCard
+                key={item.url}
+                item={item}
+                onPress={openChapter}
+                downloadedChapters={downloadedChapters}
+                downloadingChapters={downloadingChapters}
+                onDownload={downloadChapter}
+              />
+            ))}
+
+            {/* Bottom Pagination Bar */}
+            {totalPages > 1 && (
+              <View style={styles.paginationBottomBar}>
+                <TouchableOpacity
+                  style={[styles.navButton, currentPage === 1 && styles.navButtonDisabled]}
+                  onPress={() => handlePageChange(1)}
+                  disabled={currentPage === 1}
+                >
+                  <Feather name="chevrons-left" size={20} color={iconColor} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.navButton, currentPage === 1 && styles.navButtonDisabled]}
+                  onPress={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <Feather name="chevron-left" size={20} color={iconColor} />
+                </TouchableOpacity>
+
+                {generatePageNumbers().map((page, index) =>
+                  page === '...' ? (
+                    <Text key={`ellipsis-${index}`} style={styles.ellipsisText}>
+                      ...
+                    </Text>
+                  ) : (
+                    <TouchableOpacity
+                      key={`page-${page}`}
+                      style={[styles.pageButton, currentPage === page && styles.pageButtonActive]}
+                      onPress={() => handlePageChange(page as number)}
+                    >
+                      <Text
+                        style={currentPage === page ? styles.pageButtonTextActive : styles.pageButtonText}
+                      >
+                        {page}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                )}
+
+                <TouchableOpacity
+                  style={[styles.navButton, currentPage === totalPages && styles.navButtonDisabled]}
+                  onPress={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  <Feather name="chevron-right" size={20} color={iconColor} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.navButton, currentPage === totalPages && styles.navButtonDisabled]}
+                  onPress={() => handlePageChange(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  <Feather name="chevrons-right" size={20} color={iconColor} />
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={[styles.centerContainer, { padding: 40 }]}>
+            <Text style={{ color: '#888' }}>No chapters found.</Text>
+          </View>
+        )}
+      </Animated.ScrollView>
+
+      {/* FAB - scroll to top */}
       <Animated.View
         style={[
           styles.fabContainer,
           {
             opacity: fabOpacity,
-            transform: [{ translateY: fabTranslateY }]
-          }
+            transform: [{ translateY: fabTranslateY }],
+          },
         ]}
       >
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true })}
+          onPress={() => scrollViewRef.current?.scrollTo({ y: 0, animated: true })}
           activeOpacity={0.8}
         >
           <Feather name="arrow-up" size={24} color="#fff" />
         </TouchableOpacity>
       </Animated.View>
 
+      {/* Jump Modal */}
+      <Modal
+        visible={isJumpModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsJumpModalVisible(false)}
+      >
+        <RNView style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsJumpModalVisible(false)} />
+          <RNView style={[styles.manageModalContent, { width: 300 }]}>
+            <Text style={styles.manageModalTitle} lightColor="#fff" darkColor="#fff">
+              Jump to Page
+            </Text>
+            <Text style={[styles.manageModalSubtitle, { marginBottom: 10 }]} lightColor="#888" darkColor="#888">
+              Enter a page between 1 and {totalPages}
+            </Text>
+            
+            <TextInput
+              style={styles.jumpModalInput}
+              keyboardType="number-pad"
+              value={jumpPageInput}
+              onChangeText={setJumpPageInput}
+              placeholder="e.g. 10"
+              placeholderTextColor="#555"
+              autoFocus
+              onSubmitEditing={handleJumpSubmit}
+            />
+
+            <RNView style={styles.jumpModalActions}>
+              <TouchableOpacity
+                style={styles.jumpModalBtn}
+                onPress={() => setIsJumpModalVisible(false)}
+              >
+                <Text style={styles.jumpModalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.jumpModalBtn,
+                  styles.jumpModalBtnPrimary,
+                  (!jumpPageInput || parseInt(jumpPageInput, 10) < 1 || parseInt(jumpPageInput, 10) > totalPages) && styles.jumpModalBtnDisabled
+                ]}
+                onPress={handleJumpSubmit}
+                disabled={!jumpPageInput || parseInt(jumpPageInput, 10) < 1 || parseInt(jumpPageInput, 10) > totalPages}
+              >
+                <Text style={styles.jumpModalBtnTextPrimary}>Go</Text>
+              </TouchableOpacity>
+            </RNView>
+          </RNView>
+        </RNView>
+      </Modal>
+
       {/* Category Selection Modal */}
-      <Modal visible={isCategoryModalVisible} transparent={true} animationType="fade" onRequestClose={() => setIsCategoryModalVisible(false)}>
+      <Modal
+        visible={isCategoryModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsCategoryModalVisible(false)}
+      >
         <RNView style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsCategoryModalVisible(false)} />
           <RNView style={styles.manageModalContent}>
-            {/* Header */}
             <RNView style={styles.manageModalHeader}>
               <RNView style={styles.manageModalHeaderLeft}>
                 <RNView style={styles.manageIconBg}>
                   <Feather name="bookmark" size={18} color="#fff" />
                 </RNView>
                 <RNView>
-                  <Text style={styles.manageModalTitle} lightColor="#fff" darkColor="#fff">Save to Category</Text>
-                  <Text style={styles.manageModalSubtitle} lightColor="#888" darkColor="#888">Choose a folder</Text>
+                  <Text style={styles.manageModalTitle} lightColor="#fff" darkColor="#fff">
+                    Save to Category
+                  </Text>
+                  <Text style={styles.manageModalSubtitle} lightColor="#888" darkColor="#888">
+                    Choose a folder
+                  </Text>
                 </RNView>
               </RNView>
-              <TouchableOpacity onPress={() => setIsCategoryModalVisible(false)} style={styles.manageCloseBtn}>
+              <TouchableOpacity
+                onPress={() => setIsCategoryModalVisible(false)}
+                style={styles.manageCloseBtn}
+              >
                 <Feather name="x" size={20} color="#888" />
               </TouchableOpacity>
             </RNView>
 
-            {/* Divider */}
             <RNView style={styles.manageDivider} />
 
             <ScrollView style={styles.manageCatList}>
               {categories.map((cat) => (
-                <TouchableOpacity 
-                  key={cat.id} 
+                <TouchableOpacity
+                  key={cat.id}
                   style={styles.manageCatRow}
                   onPress={() => handleSaveToCategory(cat.id)}
                 >
                   <RNView style={styles.manageCatInfo}>
                     <Feather name="folder" size={16} color="#1E90FF" />
-                    <Text style={styles.manageCatName} lightColor="#ddd" darkColor="#ddd">{cat.name}</Text>
+                    <Text style={styles.manageCatName} lightColor="#ddd" darkColor="#ddd">
+                      {cat.name}
+                    </Text>
                   </RNView>
                   <Feather name="chevron-right" size={16} color="#555" />
                 </TouchableOpacity>
