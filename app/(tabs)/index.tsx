@@ -26,6 +26,12 @@ export default function LibraryScreen() {
   const [filterSource, setFilterSource] = useState<string>('All');
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
+  // View Mode
+  const [viewMode, setViewMode] = useState<'3-col' | '2-col' | 'list'>('3-col');
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === '3-col' ? '2-col' : prev === '2-col' ? 'list' : '3-col');
+  };
+
   const router = useRouter();
 
   const loadLibrary = async () => {
@@ -90,25 +96,41 @@ export default function LibraryScreen() {
     await loadLibrary();
   };
 
-  const renderNovel = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={styles.novelCard}
-      onPress={() => router.push(`/novel/details?url=${encodeURIComponent(item.novelUrl)}&sourceId=${item.sourceId}` as any)}
-      onLongPress={() => openNovelModal(item)}
-    >
-      {item.coverUrl ? (
-        <Image 
-          source={item.coverUrl} 
-          style={styles.coverImage} 
-          contentFit="cover"
-          cachePolicy="disk"
-        />
-      ) : (
-        <View style={styles.placeholderCover} />
-      )}
-      <Text style={styles.novelTitle} numberOfLines={2}>{item.title}</Text>
-    </TouchableOpacity>
-  );
+  const renderNovel = ({ item }: { item: any }) => {
+    const isList = viewMode === 'list';
+    const is2Col = viewMode === '2-col';
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.novelCard, is2Col && styles.novelCard2Col, isList && styles.novelCardList]}
+        onPress={() => router.push(`/novel/details?url=${encodeURIComponent(item.novelUrl)}&sourceId=${item.sourceId}` as any)}
+        onLongPress={() => openNovelModal(item)}
+      >
+        {item.coverUrl ? (
+          <Image 
+            source={item.coverUrl} 
+            style={isList ? styles.coverImageList : styles.coverImage} 
+            contentFit="cover"
+            cachePolicy="disk"
+          />
+        ) : (
+          <View style={isList ? styles.placeholderCoverList : styles.placeholderCover} />
+        )}
+        
+        {isList ? (
+          <RNView style={styles.novelListInfo}>
+            <Text style={styles.novelTitleList} numberOfLines={2}>{item.title}</Text>
+            <Text style={styles.novelListSubText}>{item.sourceId || 'Unknown Source'}</Text>
+            {item.totalChapters ? (
+              <Text style={styles.novelListSubText}>{item.totalChapters} Chapters</Text>
+            ) : null}
+          </RNView>
+        ) : (
+          <Text style={styles.novelTitle} numberOfLines={2}>{item.title}</Text>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const filteredLibrary = useMemo(() => {
     let result = library.filter(novel => novel.categoryId === activeCategoryId);
@@ -150,6 +172,9 @@ export default function LibraryScreen() {
       <Tabs.Screen options={{
         headerRight: () => (
           <RNView style={styles.headerRightContainer}>
+            <TouchableOpacity onPress={toggleViewMode} style={styles.headerIcon}>
+              <Feather name={viewMode === '3-col' ? 'grid' : viewMode === '2-col' ? 'columns' : 'list'} size={22} color="#1E90FF" />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => setIsFilterModalVisible(true)} style={styles.headerIcon}>
               <Feather name="filter" size={22} color="#1E90FF" />
             </TouchableOpacity>
@@ -182,10 +207,11 @@ export default function LibraryScreen() {
         </View>
       ) : (
         <FlatList
+          key={viewMode} // Force re-render when switching column counts
           data={filteredLibrary}
           keyExtractor={(item) => item.novelUrl}
           renderItem={renderNovel}
-          numColumns={3}
+          numColumns={viewMode === '3-col' ? 3 : viewMode === '2-col' ? 2 : 1}
           contentContainerStyle={styles.listContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
