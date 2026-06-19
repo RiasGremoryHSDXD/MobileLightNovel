@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
+    "@react-native-community/slider": "5.2.0",
     "axios": "^1.18.0",
     "cheerio": "^1.0.0-rc.12",
     "expo": "~56.0.12",
