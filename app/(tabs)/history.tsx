@@ -2,14 +2,16 @@ import { Text, View } from '@/components/Themed';
 import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { FlatList, TouchableOpacity, Alert } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { getHistory, removeFromHistory } from '../../services/database/Database';
 import { styles } from '../../styles/history.styles';
 
 export default function HistoryScreen() {
   const [history, setHistory] = useState<any[]>([]);
   const router = useRouter();
+  const rowRefs = useRef(new Map()).current;
 
   const loadHistory = useCallback(() => {
     try {
@@ -29,34 +31,47 @@ export default function HistoryScreen() {
     return `${Math.floor(diff / 86400000)}d ago`;
   };
 
-  const handleLongPress = (item: any) => {
-    Alert.alert(
-      "Remove History",
-      `Do you want to remove "${item.title}" from your reading history?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Remove", 
-          style: "destructive",
-          onPress: () => {
-            try {
-              removeFromHistory(item.novelUrl);
-              loadHistory();
-            } catch (e) {
-              console.error(e);
-            }
-          }
-        }
-      ]
+  const handleRemoveHistory = (novelUrl: string) => {
+    try {
+      removeFromHistory(novelUrl);
+      loadHistory();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const renderRightActions = (item: any) => {
+    return (
+      <TouchableOpacity
+        style={styles.deleteActionContainer}
+        onPress={() => handleRemoveHistory(item.novelUrl)}
+      >
+        <Feather name="trash-2" size={24} color="#fff" />
+      </TouchableOpacity>
     );
   };
 
   const renderItem = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => router.push(`/novel/details?url=${encodeURIComponent(item.novelUrl)}&sourceId=${item.sourceId}` as any)}
-      onLongPress={() => handleLongPress(item)}
+    <Swipeable
+      ref={(ref) => {
+        if (ref) {
+          rowRefs.set(item.novelUrl, ref);
+        }
+      }}
+      friction={2}
+      rightThreshold={40}
+      onSwipeableWillOpen={() => {
+        [...rowRefs.entries()].forEach(([key, ref]) => {
+          if (key !== item.novelUrl && ref) ref.close();
+        });
+      }}
+      renderRightActions={() => renderRightActions(item)}
     >
+      <TouchableOpacity
+        style={styles.card}
+        activeOpacity={1}
+        onPress={() => router.push(`/novel/details?url=${encodeURIComponent(item.novelUrl)}&sourceId=${item.sourceId}` as any)}
+      >
       <View style={styles.imageContainer}>
         {item.coverUrl ? (
           <Image
@@ -86,7 +101,8 @@ export default function HistoryScreen() {
         <Feather name="play" size={12} color="#fff" />
         <Text style={styles.resumeText}>Resume</Text>
       </TouchableOpacity>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Swipeable>
   );
 
   return (
