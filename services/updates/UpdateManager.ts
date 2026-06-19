@@ -1,11 +1,14 @@
 import { getLibrary, updateLibraryTotalChapters, addUpdate, setCache } from '../database/Database';
 import { ExtensionManager } from '../extensions/ExtensionManager';
 
-export const checkForUpdates = async (): Promise<number> => {
+export const checkForUpdates = async (isBackground: boolean = false): Promise<number> => {
   const library = getLibrary();
   let totalNewChapters = 0;
 
-  for (const novel of library as any[]) {
+  // Limit background updates to the first 30 library items to prevent OS timeout
+  const targetLibrary = isBackground ? (library as any[]).slice(0, 30) : library;
+
+  for (const novel of targetLibrary as any[]) {
     try {
       const extension = ExtensionManager.getExtension(novel.sourceId);
       if (!extension) continue;
