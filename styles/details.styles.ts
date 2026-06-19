@@ -64,7 +64,36 @@ export const styles = StyleSheet.create({
   novelAuthor: {
     fontSize: 16,
     color: '#888',
+    marginBottom: 8,
+  },
+  metadataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
     marginBottom: 15,
+    gap: 10,
+  },
+  metadataItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metadataText: {
+    fontSize: 13,
+    color: '#888',
+    marginLeft: 4,
+    fontWeight: 'bold',
+  },
+  badge: {
+    backgroundColor: 'rgba(30, 144, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeText: {
+    color: '#1E90FF',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
   },
   actionRow: {
     flexDirection: 'row',
