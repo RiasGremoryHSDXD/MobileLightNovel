@@ -48,6 +48,7 @@ export const styles = StyleSheet.create({
     borderRadius: 6,
     overflow: 'hidden',
     marginRight: 15,
+    backgroundColor: 'transparent',
   },
   coverImage: {
     width: '100%',
@@ -63,6 +64,7 @@ export const styles = StyleSheet.create({
   info: {
     flex: 1,
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 16,
@@ -77,6 +79,7 @@ export const styles = StyleSheet.create({
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   timeText: {
     fontSize: 12,

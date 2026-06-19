@@ -55,7 +55,7 @@ export const styles = StyleSheet.create({
     height: 70,
     borderRadius: 6,
     overflow: 'hidden',
-    backgroundColor: '#333',
+    backgroundColor: 'transparent',
     marginRight: 16,
   },
   coverImage: {
@@ -67,10 +67,12 @@ export const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
   },
   info: {
     flex: 1,
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   title: {
     fontSize: 16,
@@ -116,6 +118,7 @@ export const styles = StyleSheet.create({
   },
   groupContainer: {
     marginBottom: 12,
+    backgroundColor: 'transparent',
   },
   expandedList: {
     backgroundColor: 'rgba(150,150,150,0.05)',
@@ -133,6 +136,7 @@ export const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(150,150,150,0.2)',
+    backgroundColor: 'transparent',
   },
   emptyContainer: {
     flex: 1,

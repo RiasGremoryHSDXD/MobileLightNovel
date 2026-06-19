@@ -110,7 +110,7 @@ export default function MoreScreen() {
               <Text style={[styles.settingDesc, { color: subTextColor }]}>Overall app appearance</Text>
             </View>
           </View>
-          <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: borderColor }}>
+          <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: borderColor, backgroundColor: 'transparent' }}>
             {(['system', 'light', 'dark'] as const).map((t) => (
               <TouchableOpacity
                 key={t}
@@ -158,7 +158,7 @@ export default function MoreScreen() {
               <Text style={[styles.settingDesc, { color: subTextColor }]}>Reader appearance</Text>
             </View>
           </View>
-          <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 16 }}>
+          <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingBottom: 16, backgroundColor: 'transparent' }}>
             {(['system', 'light', 'dark', 'sepia'] as const).map((t) => (
               <TouchableOpacity
                 key={t}

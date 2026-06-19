@@ -36,6 +36,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    backgroundColor: 'transparent',
   },
   settingRowNoBorder: {
     borderBottomWidth: 0,
@@ -51,6 +52,7 @@ export const styles = StyleSheet.create({
   settingInfo: {
     flex: 1,
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   settingName: {
     fontSize: 16,
@@ -73,6 +75,7 @@ export const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 15,
+    backgroundColor: 'transparent',
   },
   fontBtn: {
     width: 32,
