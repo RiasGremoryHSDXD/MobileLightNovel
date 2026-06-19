@@ -2,7 +2,7 @@ import { StyleSheet, FlatList, TouchableOpacity, RefreshControl, ScrollView, Mod
 import { Image } from 'expo-image';
 import { Text, View } from '@/components/Themed';
 import Feather from '@expo/vector-icons/Feather';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { useFocusEffect, useRouter, Tabs } from 'expo-router';
 import { getLibrary, getCategories, changeNovelCategory, removeFromLibrary, addCategory, deleteCategory } from '../../services/database/Database';
 import { styles } from '../../styles/index.styles';
@@ -20,6 +20,11 @@ export default function LibraryScreen() {
   // Manage Categories state
   const [isManageModalVisible, setIsManageModalVisible] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  // Sort and Filter state
+  const [sortBy, setSortBy] = useState<'added' | 'alpha' | 'read' | 'chapters'>('added');
+  const [filterSource, setFilterSource] = useState<string>('All');
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
   const router = useRouter();
 
@@ -105,18 +110,53 @@ export default function LibraryScreen() {
     </TouchableOpacity>
   );
 
-  const filteredLibrary = library.filter(novel => novel.categoryId === activeCategoryId);
+  const filteredLibrary = useMemo(() => {
+    let result = library.filter(novel => novel.categoryId === activeCategoryId);
+    
+    // Filter by source
+    if (filterSource !== 'All') {
+      result = result.filter(novel => novel.sourceId === filterSource);
+    }
+    
+    // Sort
+    result = [...result].sort((a, b) => {
+      if (sortBy === 'alpha') {
+        return a.title.toLowerCase().localeCompare(b.title.toLowerCase());
+      } else if (sortBy === 'read') {
+        const aRead = a.lastReadAt || 0;
+        const bRead = b.lastReadAt || 0;
+        if (aRead !== bRead) return bRead - aRead;
+        return (b.addedAt || 0) - (a.addedAt || 0);
+      } else if (sortBy === 'chapters') {
+        const aChaps = a.totalChapters || 0;
+        const bChaps = b.totalChapters || 0;
+        if (aChaps !== bChaps) return bChaps - aChaps;
+        return a.title.toLowerCase().localeCompare(b.title.toLowerCase());
+      } else {
+        return (b.addedAt || 0) - (a.addedAt || 0);
+      }
+    });
+
+    return result;
+  }, [library, activeCategoryId, sortBy, filterSource]);
+
+  const availableSources = useMemo(() => {
+    const sources = new Set(library.map(novel => novel.sourceId));
+    return ['All', ...Array.from(sources)];
+  }, [library]);
 
   return (
     <View style={styles.container}>
       <Tabs.Screen options={{
         headerRight: () => (
-          <TouchableOpacity 
-            onPress={() => setIsManageModalVisible(true)} 
-            style={{ marginRight: 16, padding: 4 }}
-          >
-            <Feather name="settings" size={22} color="#1E90FF" />
-          </TouchableOpacity>
+          <RNView style={styles.headerRightContainer}>
+            <TouchableOpacity onPress={() => setIsFilterModalVisible(true)} style={styles.headerIcon}>
+              <Feather name="filter" size={22} color="#1E90FF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setIsManageModalVisible(true)} style={styles.headerIcon}>
+              <Feather name="settings" size={22} color="#1E90FF" />
+            </TouchableOpacity>
+          </RNView>
         )
       }} />
       <View style={styles.tabContainer}>
@@ -137,8 +177,8 @@ export default function LibraryScreen() {
 
       {filteredLibrary.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.title}>This Category is Empty</Text>
-          <Text style={styles.subtitle}>Discover new novels or move them here.</Text>
+          <Text style={styles.title}>No Novels Found</Text>
+          <Text style={styles.subtitle}>Try changing your filters or adding novels.</Text>
         </View>
       ) : (
         <FlatList
@@ -294,6 +334,51 @@ export default function LibraryScreen() {
             </TouchableOpacity>
           </RNView>
         </RNView>
+      </Modal>
+
+      {/* Filter & Sort Modal */}
+      <Modal visible={isFilterModalVisible} transparent animationType="slide" onRequestClose={() => setIsFilterModalVisible(false)}>
+        <Pressable style={styles.filterModalOverlay} onPress={() => setIsFilterModalVisible(false)}>
+          <RNView style={styles.filterModalContent} onStartShouldSetResponder={() => true}>
+            <RNView style={styles.filterDragHandle} />
+            <RNView style={styles.filterModalHeader}>
+              <Text style={styles.filterModalTitle}>Sort & Filter</Text>
+              <TouchableOpacity onPress={() => setIsFilterModalVisible(false)}>
+                <Feather name="x" size={24} color="#888" />
+              </TouchableOpacity>
+            </RNView>
+            
+            <Text style={styles.filterSectionTitle}>Sort By</Text>
+            <RNView style={styles.filterChipContainer}>
+              {(['added', 'alpha', 'read', 'chapters'] as const).map(option => (
+                <TouchableOpacity
+                  key={option}
+                  style={[styles.filterChip, sortBy === option && styles.activeFilterChip]}
+                  onPress={() => setSortBy(option)}
+                >
+                  <Text style={[styles.filterChipText, sortBy === option && styles.activeFilterChipText]}>
+                    {option === 'added' ? 'Recently Added' : option === 'alpha' ? 'Alphabetical' : option === 'read' ? 'Last Read' : 'Total Chapters'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </RNView>
+
+            <Text style={styles.filterSectionTitle}>Filter by Source</Text>
+            <ScrollView style={{ maxHeight: 150 }} showsVerticalScrollIndicator={false}>
+              <RNView style={styles.filterChipContainer}>
+                {availableSources.map(source => (
+                  <TouchableOpacity
+                    key={source}
+                    style={[styles.filterChip, filterSource === source && styles.activeFilterChip]}
+                    onPress={() => setFilterSource(source)}
+                  >
+                    <Text style={[styles.filterChipText, filterSource === source && styles.activeFilterChipText]}>{source}</Text>
+                  </TouchableOpacity>
+                ))}
+              </RNView>
+            </ScrollView>
+          </RNView>
+        </Pressable>
       </Modal>
     </View>
   );
