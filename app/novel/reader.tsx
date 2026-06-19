@@ -8,6 +8,7 @@ import { addToHistory, getCache, saveScrollProgress, getScrollProgress, markChap
 import { styles } from '../../styles/reader.styles';
 import { ExtensionManager } from '../../services/extensions/ExtensionManager';
 import Slider from '@react-native-community/slider';
+import { useKeepAwake } from 'expo-keep-awake';
 
 const { width } = Dimensions.get('window');
 
@@ -102,6 +103,7 @@ export default function ReaderScreen() {
   const colorScheme = useColorScheme();
 
   const [chapters, setChapters] = useState<any[]>([]);
+  useKeepAwake();
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [settings, setSettings] = useState<ReaderSettings>(() => getReaderSettings());
   const [showMenu, setShowMenu] = useState(true);
