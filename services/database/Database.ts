@@ -73,6 +73,22 @@ export const initDB = () => {
     );
   `);
 
+  // Create Settings table
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `);
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      sortOrder INTEGER DEFAULT 0,
+      isSystemDefault BOOLEAN DEFAULT 0
+    );
+  `);
+
   // Populate default categories if empty
   const categoryCount = db.getFirstSync<{count: number}>('SELECT COUNT(*) as count FROM categories;');
   if (categoryCount && categoryCount.count === 0) {
@@ -136,7 +152,7 @@ export const getDownloadedChapterUrls = (urls: string[]): Set<string> => {
 };
 
 export const clearRequestCache = () => {
-  db.execSync('DELETE FROM request_cache;');
+  db.execSync('DELETE FROM request_cache WHERE key LIKE "chapter_%" OR key LIKE "search_%" OR key LIKE "popular_%" OR key LIKE "latest_%";');
   db.execSync('VACUUM;'); // Shrink the database file and release storage back to the OS
 };
 
@@ -398,4 +414,22 @@ export const renameCategory = (id: number, newName: string) => {
 export const changeNovelCategory = (novelUrl: string, categoryId: number) => {
   const statement = db.prepareSync('UPDATE library SET categoryId = ? WHERE novelUrl = ?');
   statement.executeSync([categoryId, novelUrl]);
+};
+
+// Settings
+export const getSetting = (key: string, defaultValue: string): string => {
+  try {
+    const row = db.getFirstSync<{value: string}>(`SELECT value FROM settings WHERE key = ?`, [key]);
+    return row ? row.value : defaultValue;
+  } catch (e) {
+    return defaultValue;
+  }
+};
+
+export const setSetting = (key: string, value: string) => {
+  try {
+    db.runSync(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`, [key, value]);
+  } catch (e) {
+    console.error('Failed to set setting', e);
+  }
 };

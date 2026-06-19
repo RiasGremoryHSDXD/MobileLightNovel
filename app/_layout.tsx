@@ -7,6 +7,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { DownloadProvider } from '@/contexts/DownloadContext';
 import { registerBackgroundFetchAsync } from '../services/background/BackgroundTask';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StatusBar } from 'expo-status-bar';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -54,6 +55,7 @@ function RootLayoutNav() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
         <DownloadProvider>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
