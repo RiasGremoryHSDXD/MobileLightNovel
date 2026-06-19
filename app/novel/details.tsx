@@ -437,6 +437,28 @@ export default function NovelDetailsScreen() {
               </Text>
               <Text style={styles.novelAuthor}>{novel.author}</Text>
 
+              {(novel.status || novel.rating || novel.views) && (
+                <View style={styles.metadataRow}>
+                  {novel.status && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{novel.status}</Text>
+                    </View>
+                  )}
+                  {novel.rating && (
+                    <View style={styles.metadataItem}>
+                      <Feather name="star" size={14} color="#FFD700" />
+                      <Text style={styles.metadataText}>{novel.rating}</Text>
+                    </View>
+                  )}
+                  {novel.views && (
+                    <View style={styles.metadataItem}>
+                      <Feather name="eye" size={14} color="#888" />
+                      <Text style={styles.metadataText}>{novel.views}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+
               <View style={styles.actionRow}>
                 <TouchableOpacity
                   style={[styles.actionButton, isSaved && { backgroundColor: '#1E90FF' }]}
