@@ -32,6 +32,11 @@ export default function SourceScreen() {
 
   // Cache the fetched novels so we can restore them when search closes or switching tabs rapidly
   const cachedNovelsRef = useRef<Record<string, any[]>>({ popular: [], latest: [] });
+  // Cache the pagination state for each tab
+  const tabStateRef = useRef<Record<string, { page: number, hasMore: boolean }>>({
+    popular: { page: 1, hasMore: true },
+    latest: { page: 1, hasMore: true }
+  });
 
   const loadNovels = useCallback(async (pageNum: number, tab: 'popular' | 'latest', isLoadMore = false) => {
     if (!extension) return;
@@ -51,6 +56,7 @@ export default function SourceScreen() {
 
       if (data.length === 0) {
         setHasMore(false);
+        tabStateRef.current[tab].hasMore = false;
       } else {
         if (isLoadMore) {
           setResults(prev => [...prev, ...data]);
@@ -59,6 +65,8 @@ export default function SourceScreen() {
           setResults(data);
           cachedNovelsRef.current[tab] = data;
         }
+        setPage(pageNum);
+        tabStateRef.current[tab].page = pageNum;
       }
     } catch (e) {
       console.error(`Failed to fetch ${tab} novels`, e);
@@ -69,13 +77,15 @@ export default function SourceScreen() {
   }, [extension]);
 
   useEffect(() => {
-    // Initial load when tab changes
-    setPage(1);
-    setHasMore(true);
-    // If we already have it cached, show instantly to avoid flicker, but still fetch silently (or skip fetch)
+    // Restore state specific to the active tab
+    const state = tabStateRef.current[browseTab];
     if (cachedNovelsRef.current[browseTab].length > 0) {
+      setPage(state.page);
+      setHasMore(state.hasMore);
       setResults(cachedNovelsRef.current[browseTab]);
     } else {
+      setPage(1);
+      setHasMore(true);
       loadNovels(1, browseTab);
     }
   }, [browseTab, loadNovels]);
@@ -83,7 +93,7 @@ export default function SourceScreen() {
   const handleLoadMore = () => {
     if (!hasMore || loadingMore || loading || showSearch) return;
     const nextPage = page + 1;
-    setPage(nextPage);
+    // Wait for fetch success to increment the official page state
     loadNovels(nextPage, browseTab, true);
   };
 
