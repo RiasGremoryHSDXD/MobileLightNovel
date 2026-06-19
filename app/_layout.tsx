@@ -7,6 +7,7 @@ import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
 import { checkForUpdates } from '../services/updates/UpdateManager';
 import { useColorScheme } from '@/components/useColorScheme';
+import { DownloadProvider } from '@/contexts/DownloadContext';
 
 const BACKGROUND_UPDATE_TASK = 'BACKGROUND_UPDATE_TASK';
 
@@ -80,10 +81,12 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
+      <DownloadProvider>
+        <Stack>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        </Stack>
+      </DownloadProvider>
     </ThemeProvider>
   );
 }

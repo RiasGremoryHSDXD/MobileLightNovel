@@ -13,10 +13,12 @@ import {
   Modal,
   Pressable,
   View as RNView,
+  useWindowDimensions,
 } from 'react-native';
 import { Image } from 'expo-image';
 
 import { Text, View } from '@/components/Themed';
+import { useDownload } from '@/contexts/DownloadContext';
 // @ts-ignore
 import { ExtensionManager } from '../../services/extensions/ExtensionManager';
 import {
@@ -99,14 +101,13 @@ export default function NovelDetailsScreen() {
   const [readChapters, setReadChapters] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<any[]>([]);
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number; title: string } | null>(null);
   const [isBatchModalVisible, setIsBatchModalVisible] = useState(false);
   const [undownloadedChaptersList, setUndownloadedChaptersList] = useState<any[]>([]);
-  const [alertModalConfig, setAlertModalConfig] = useState<{title: string, message: string, visible: boolean}>({ title: '', message: '', visible: false });
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [customRangeError, setCustomRangeError] = useState('');
-  const cancelDownloadRef = useRef(false);
+  
+  const { startBatchDownload, batchProgress } = useDownload();
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -222,53 +223,12 @@ export default function NovelDetailsScreen() {
     [sourceId]
   );
 
-  const performBatchDownload = async (chaptersToDownload: any[]) => {
-    cancelDownloadRef.current = false;
-    if (chaptersToDownload.length === 0) return;
-    
-    setBatchProgress({ current: 0, total: chaptersToDownload.length, title: 'Starting...' });
-    
-    const extension = ExtensionManager.getExtension(sourceId as string);
-    if (!extension) {
-      setBatchProgress(null);
+  const handleDownload = () => {
+    if (batchProgress !== null) {
+      Alert.alert('Download in Progress', 'Please wait for the current download to finish or cancel it.');
       return;
     }
 
-    let successCount = 0;
-    
-    for (let i = 0; i < chaptersToDownload.length; i++) {
-      if (cancelDownloadRef.current) {
-        break;
-      }
-      
-      const ch = chaptersToDownload[i];
-      setBatchProgress({ current: i + 1, total: chaptersToDownload.length, title: ch.title });
-      
-      try {
-        const text = await extension.getChapterContent(ch.url);
-        setCache(`chapter_${ch.url}`, text);
-        setDownloadedChapters((prev) => new Set(prev).add(`chapter_${ch.url}`));
-        successCount++;
-        // Small delay to prevent hammering the server
-        await new Promise((res) => setTimeout(res, 500));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    
-    const wasCancelled = cancelDownloadRef.current;
-    
-    setBatchProgress(null);
-    setDownloadingChapters(new Set());
-    
-    setAlertModalConfig({
-      title: wasCancelled ? 'Download Stopped' : 'Download Complete',
-      message: `Successfully downloaded ${successCount} of ${chaptersToDownload.length} chapters.`,
-      visible: true
-    });
-  };
-
-  const handleDownload = () => {
     if (!novel || !novel.chapters) return;
     
     // Create chronological list of chapters (oldest first)
@@ -279,11 +239,7 @@ export default function NovelDetailsScreen() {
     const undownloaded = unread.filter((c) => !downloadedChapters.has(`chapter_${c.url}`));
     
     if (undownloaded.length === 0) {
-      setAlertModalConfig({
-        title: 'Batch Download',
-        message: 'All unread chapters are already downloaded.',
-        visible: true
-      });
+      // Could show a toast, but keeping it simple for now
       return;
     }
 
@@ -336,7 +292,9 @@ export default function NovelDetailsScreen() {
     setIsBatchModalVisible(false);
     setCustomStart('');
     setCustomEnd('');
-    performBatchDownload(undownloaded);
+    startBatchDownload(undownloaded, sourceId as string, (url) => {
+      setDownloadedChapters((prev) => new Set(prev).add(url));
+    });
   };
 
 
@@ -446,8 +404,6 @@ export default function NovelDetailsScreen() {
     );
   }
 
-  // The handleDownload function has been moved up to use the batch downloading logic
-
   return (
     <View style={styles.container}>
       <Stack.Screen
@@ -461,18 +417,6 @@ export default function NovelDetailsScreen() {
           ),
         }}
       />
-
-      {batchProgress && (
-        <View style={styles.batchProgressContainer}>
-          <Text style={styles.batchProgressText}>
-            Downloading {batchProgress.current}/{batchProgress.total} - {batchProgress.title}
-          </Text>
-          <ActivityIndicator size="small" color="#1E90FF" style={{ marginRight: 15 }} />
-          <TouchableOpacity onPress={() => { cancelDownloadRef.current = true; }}>
-            <Feather name="x-circle" size={22} color="#FF6B6B" />
-          </TouchableOpacity>
-        </View>
-      )}
 
       <ScrollView
         ref={scrollViewRef}
@@ -716,7 +660,9 @@ export default function NovelDetailsScreen() {
                     style={styles.batchDownloadBtn}
                     onPress={() => {
                       setIsBatchModalVisible(false);
-                      performBatchDownload(undownloadedChaptersList.slice(0, 20));
+                      startBatchDownload(undownloadedChaptersList.slice(0, 20), sourceId as string, (url) => {
+                        setDownloadedChapters((prev) => new Set(prev).add(url));
+                      });
                     }}
                   >
                     <Feather name="arrow-down-circle" size={20} color="#fff" />
@@ -729,7 +675,9 @@ export default function NovelDetailsScreen() {
                     style={styles.batchDownloadBtn}
                     onPress={() => {
                       setIsBatchModalVisible(false);
-                      performBatchDownload(undownloadedChaptersList.slice(0, 50));
+                      startBatchDownload(undownloadedChaptersList.slice(0, 50), sourceId as string, (url) => {
+                        setDownloadedChapters((prev) => new Set(prev).add(url));
+                      });
                     }}
                   >
                     <Feather name="arrow-down-circle" size={20} color="#fff" />
@@ -741,7 +689,9 @@ export default function NovelDetailsScreen() {
                   style={[styles.batchDownloadBtn, styles.batchDownloadBtnPrimary]}
                   onPress={() => {
                     setIsBatchModalVisible(false);
-                    performBatchDownload(undownloadedChaptersList);
+                    startBatchDownload(undownloadedChaptersList, sourceId as string, (url) => {
+                      setDownloadedChapters((prev) => new Set(prev).add(url));
+                    });
                   }}
                 >
                   <Feather name="download-cloud" size={20} color="#fff" />
@@ -777,43 +727,6 @@ export default function NovelDetailsScreen() {
                   <Text style={styles.batchRangeError}>{customRangeError}</Text>
                 ) : null}
               </RNView>
-            </RNView>
-          </RNView>
-        </RNView>
-      </Modal>
-
-      {/* Custom Alert Modal */}
-      <Modal
-        visible={alertModalConfig.visible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setAlertModalConfig(prev => ({ ...prev, visible: false }))}
-      >
-        <RNView style={styles.batchModalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setAlertModalConfig(prev => ({ ...prev, visible: false }))} />
-          <RNView style={styles.batchModalContent}>
-            <RNView style={styles.batchModalHeader}>
-              <Text style={styles.batchModalTitle}>{alertModalConfig.title}</Text>
-              <TouchableOpacity onPress={() => setAlertModalConfig(prev => ({ ...prev, visible: false }))}>
-                <Feather name="x" size={24} color="#888" />
-              </TouchableOpacity>
-            </RNView>
-            <RNView style={{ padding: 25, alignItems: 'center' }}>
-              {alertModalConfig.title.toLowerCase().includes('complete') ? (
-                <Feather name="check-circle" size={48} color="#2E8B57" style={{ marginBottom: 15 }} />
-              ) : (
-                <Feather name="info" size={48} color="#1E90FF" style={{ marginBottom: 15 }} />
-              )}
-              <Text style={{ color: '#ccc', marginBottom: 25, fontSize: 16, textAlign: 'center', lineHeight: 22 }}>
-                {alertModalConfig.message}
-              </Text>
-              
-              <TouchableOpacity
-                style={[styles.batchDownloadBtn, styles.batchDownloadBtnPrimary, { width: '100%' }]}
-                onPress={() => setAlertModalConfig(prev => ({ ...prev, visible: false }))}
-              >
-                <Text style={styles.batchDownloadBtnText}>Okay</Text>
-              </TouchableOpacity>
             </RNView>
           </RNView>
         </RNView>
