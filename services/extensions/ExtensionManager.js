@@ -10,6 +10,8 @@ export const ExtensionManager = {
       source: 'boxnovel.com',
       lang: 'en',
       searchNovel: BoxNovelParser.searchNovel,
+      getPopularNovels: async () => [],
+      getLatestUpdates: async () => [],
       getNovelDetails: async () => null,
       getChapterContent: async () => "Content not implemented yet for BoxNovel."
     }

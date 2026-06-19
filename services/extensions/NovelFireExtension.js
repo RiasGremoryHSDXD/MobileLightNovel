@@ -25,39 +25,60 @@ export const NovelFireExtension = {
   source: 'novelfire.net',
   lang: 'en',
 
+  _parseNovelList($) {
+    const novels = [];
+    $('ul.novel-list li.novel-item').each((i, element) => {
+      const anchor = $(element).find('a').first();
+      const href = anchor.attr('href');
+      const title = $(element).find('h4.novel-title').text().trim() || anchor.attr('title')?.trim();
+      let img = $(element).find('figure.novel-cover img').attr('data-src') || $(element).find('figure.novel-cover img').attr('src');
+      if (img && img.startsWith('data:')) img = null;
+
+      if (title && href) {
+        const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+        novels.push({
+          title,
+          coverUrl: img ? (img.startsWith('http') ? img : `${BASE_URL}${img}`) : null,
+          novelUrl: fullUrl,
+          source: 'NovelFire',
+        });
+      }
+    });
+    return novels;
+  },
+
   async searchNovel(query) {
     try {
       const url = `${BASE_URL}/search?keyword=${encodeURIComponent(query)}`;
       const html = await fetchHtml(url);
       const $ = cheerio.load(html);
-      const novels = [];
-
-      // Each search result is a <li class="novel-item"> inside <ul class="novel-list">
-      $('ul.novel-list li.novel-item').each((i, element) => {
-        // The direct <a> child of the <li> is the link to the novel
-        const anchor = $(element).find('a').first();
-        const href = anchor.attr('href');
-        const title = $(element).find('h4.novel-title').text().trim()
-          || anchor.attr('title')?.trim();
-
-        // Cover image is inside <figure class="novel-cover">
-        const img = $(element).find('figure.novel-cover img').attr('src')
-          || $(element).find('figure.novel-cover img').attr('data-src');
-
-        if (title && href) {
-          const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
-          novels.push({
-            title,
-            coverUrl: img ? (img.startsWith('http') ? img : `${BASE_URL}${img}`) : null,
-            novelUrl: fullUrl,
-            source: 'NovelFire',
-          });
-        }
-      });
-
-      return novels;
+      return this._parseNovelList($);
     } catch (error) {
       console.error('Error searching NovelFire:', error);
+      return [];
+    }
+  },
+
+  async getPopularNovels(page = 1) {
+    try {
+      const url = `${BASE_URL}/genre-all/sort-popular/status-all/all-novel?page=${page}`;
+      const html = await fetchHtml(url);
+      const $ = cheerio.load(html);
+      return this._parseNovelList($);
+    } catch (error) {
+      console.error('Error fetching popular novels from NovelFire:', error);
+      return [];
+    }
+  },
+
+  async getLatestUpdates(page = 1) {
+    try {
+      const url = `${BASE_URL}/latest-release-novels?page=${page}`;
+      const html = await fetchHtml(url);
+      const $ = cheerio.load(html);
+      return this._parseNovelList($);
+    } catch (error) {
+      console.error('Error fetching latest updates from NovelFire:', error);
       return [];
     }
   },
