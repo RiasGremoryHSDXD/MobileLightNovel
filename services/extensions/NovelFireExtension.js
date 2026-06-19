@@ -1,58 +1,61 @@
-import axios from 'axios';
 import * as cheerio from 'cheerio';
 
 const BASE_URL = 'https://novelfire.net';
+
+const HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Connection': 'keep-alive',
+  'Upgrade-Insecure-Requests': '1',
+  'Cache-Control': 'max-age=0',
+};
+
+async function fetchHtml(url) {
+  const response = await fetch(url, { headers: HEADERS });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} for ${url}`);
+  }
+  return response.text();
+}
 
 export const NovelFireExtension = {
   id: 'novelfire',
   name: 'NovelFire',
   source: 'novelfire.net',
   lang: 'en',
-  
+
   async searchNovel(query) {
     try {
       const url = `${BASE_URL}/search?keyword=${encodeURIComponent(query)}`;
-      const response = await axios.get(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        }
-      });
-
-      const $ = cheerio.load(response.data);
+      const html = await fetchHtml(url);
+      const $ = cheerio.load(html);
       const novels = [];
 
-      $('a[href^="/book/"]').each((i, element) => {
-        const title = $(element).find('.novel-title').text().trim() || $(element).attr('title');
-        const urlPath = $(element).attr('href');
-        let img = $(element).find('img').attr('data-src') || $(element).find('img').attr('src');
-        
-        let summaryParts = [];
-        $(element).find('.novel-stats').each((j, el) => {
-          summaryParts.push($(el).text().trim());
-        });
+      // Each search result is a <li class="novel-item"> inside <ul class="novel-list">
+      $('ul.novel-list li.novel-item').each((i, element) => {
+        // The direct <a> child of the <li> is the link to the novel
+        const anchor = $(element).find('a').first();
+        const href = anchor.attr('href');
+        const title = $(element).find('h4.novel-title').text().trim()
+          || anchor.attr('title')?.trim();
 
-        if (title && urlPath) {
+        // Cover image is inside <figure class="novel-cover">
+        const img = $(element).find('figure.novel-cover img').attr('src')
+          || $(element).find('figure.novel-cover img').attr('data-src');
+
+        if (title && href) {
+          const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
           novels.push({
-            title: title.trim(),
-            coverUrl: img ? `${BASE_URL}${img}` : null,
-            novelUrl: `${BASE_URL}${urlPath}`,
+            title,
+            coverUrl: img ? (img.startsWith('http') ? img : `${BASE_URL}${img}`) : null,
+            novelUrl: fullUrl,
             source: 'NovelFire',
-            summary: summaryParts.join(' • ')
           });
         }
       });
 
-      const uniqueNovels = [];
-      const seenUrls = new Set();
-      for (const novel of novels) {
-        if (!seenUrls.has(novel.novelUrl)) {
-          seenUrls.add(novel.novelUrl);
-          uniqueNovels.push(novel);
-        }
-      }
-
-      return uniqueNovels;
+      return novels;
     } catch (error) {
       console.error('Error searching NovelFire:', error);
       return [];
@@ -61,49 +64,64 @@ export const NovelFireExtension = {
 
   async getNovelDetails(novelUrl) {
     try {
-      const response = await axios.get(novelUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      const html = await fetchHtml(novelUrl);
+      const $ = cheerio.load(html);
+
+      // Title: <h1 class="novel-title"> or <h1 itemprop="name">
+      const title = $('h1.novel-title, h1[itemprop="name"]').text().trim();
+
+      // Author: inside .novel-info .author
+      const author = $('.novel-info .author a').text().trim()
+        || $('.author').text().replace('Author:', '').trim();
+
+      // Cover image: <figure class="cover"> img
+      const coverUrl = $('figure.cover img').attr('src')
+        || $('figure.cover img').attr('data-src');
+
+      // Summary
+      let summary = $('.summary .content').text().trim()
+        || $('.summary').text().trim()
+        || $('.description').text().trim();
+      summary = summary.replace(/Show more/gi, '').replace(/Show less/gi, '').trim();
+
+      // Chapter count: inside .header-stats, look for the element labelled "Chapters"
+      // Structure: <div class="header-stats"><span><strong>3050</strong> Chapters</span>...
+      let totalChapters = 0;
+      $('.header-stats span').each((i, el) => {
+        const text = $(el).text();
+        if (text.toLowerCase().includes('chapter')) {
+          const num = parseInt($(el).find('strong').text().replace(/[^0-9]/g, ''));
+          if (!isNaN(num) && num > 0) totalChapters = num;
         }
       });
-      const $ = cheerio.load(response.data);
-      
-      const title = $('h1.novel-title').text().trim();
-      const author = $('div.author span[itemprop="author"]').text().trim();
-      const coverUrl = $('.fixed-img img').attr('src') || $('.novel-cover img').attr('src') || $('img.lazy').first().attr('data-src');
-      
-      let summary = $('.summary .content').text().trim() || $('.summary').text().trim();
-      if (summary.startsWith('Summary')) {
-        summary = summary.replace('Summary', '').trim();
-      }
-      summary = summary.replace(/Show more/gi, '').replace(/Show less/gi, '').trim();
-      
-      const chaptersText = $('.header-stats span:has(.icon-book-open) strong').text().trim() || '0';
-      const totalChapters = parseInt(chaptersText.replace(/[^0-9]/g, '')) || 0;
-      
+
+      // Build chapter list from 1 to totalChapters
+      // NovelFire uses /book/<slug>/chapter-<n> format
       const chapters = [];
       for (let i = 1; i <= totalChapters; i++) {
         chapters.push({
           number: i,
           title: `Chapter ${i}`,
-          url: `${novelUrl}/chapter-${i}`
+          url: `${novelUrl}/chapter-${i}`,
         });
       }
 
+      // Genres: <div class="categories"> <a> tags
       const genres = [];
-      $('.categories a, .novel-categories a, .genres a, .categories ul li a, ul.categories li a, .category a, .categories-list a, .genre-list a, .category-box a, .tags a, .tag a').each((i, el) => {
-        const genreText = $(el).text().trim();
-        if (genreText) genres.push(genreText);
+      $('.categories a, a[href*="/genre-"]').each((i, el) => {
+        const g = $(el).text().trim();
+        if (g) genres.push(g);
       });
 
       return {
         title,
         author: author || 'Unknown',
-        coverUrl: coverUrl ? (coverUrl.startsWith('http') ? coverUrl : `${BASE_URL}${coverUrl}`) : null,
+        coverUrl: coverUrl
+          ? (coverUrl.startsWith('http') ? coverUrl : `${BASE_URL}${coverUrl}`)
+          : null,
         summary: summary || 'No description available.',
-        genres,
-        chapters: chapters.reverse() 
+        genres: [...new Set(genres)], // deduplicate
+        chapters: chapters.reverse(), // newest first
       };
     } catch (error) {
       console.error('Error fetching novel details:', error);
@@ -113,27 +131,21 @@ export const NovelFireExtension = {
 
   async getChapterContent(chapterUrl) {
     try {
-      const response = await axios.get(chapterUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        }
-      });
-      const $ = cheerio.load(response.data);
-      
+      const html = await fetchHtml(chapterUrl);
+      const $ = cheerio.load(html);
+
       const contentNode = $('#chapter-content, .chapter-container, #content, .content, .text-left').first();
       contentNode.find('script, iframe, style, .ad, .advertisement').remove();
-      
+
       let paragraphs = [];
       contentNode.find('p').each((i, el) => {
         const text = $(el).text().trim();
         if (text) paragraphs.push(text);
       });
-      
+
       if (paragraphs.length === 0) {
-        // Fallback if no <p> tags are used, split by <br> or newlines
         contentNode.find('br').replaceWith('\n');
-        let rawText = contentNode.text().trim();
+        const rawText = contentNode.text().trim();
         paragraphs = rawText.split('\n').map(p => p.trim()).filter(p => p.length > 0);
       }
 
@@ -142,5 +154,5 @@ export const NovelFireExtension = {
       console.error('Error fetching chapter content:', error);
       return 'Error loading chapter content.';
     }
-  }
+  },
 };
