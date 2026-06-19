@@ -28,12 +28,26 @@ export const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingTop: 15,
-    paddingBottom: 50, // safe area
+    paddingBottom: 40, // safe area
     borderTopWidth: 1,
     borderTopColor: 'rgba(150,150,150,0.2)',
+  },
+  settingsRow: {
     flexDirection: 'row',
     justifyContent: 'space-evenly',
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  themeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: '#aaa',
+  },
+  themeButtonActive: {
+    borderWidth: 2,
+    borderColor: '#1E90FF',
   },
   menuIcon: {
     padding: 10,
