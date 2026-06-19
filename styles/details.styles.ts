@@ -15,7 +15,7 @@ export const styles = StyleSheet.create({
   },
   coverImage: {
     width: 100,
-    height: 90,
+    height: 150,
     borderRadius: 6,
     marginRight: 15,
   },
@@ -155,6 +155,9 @@ export const styles = StyleSheet.create({
   chapterTitle: {
     fontSize: 16,
     marginRight: 10,
+  },
+  chapterTitleRead: {
+    color: '#888',
   },
 
   modalOverlay: {

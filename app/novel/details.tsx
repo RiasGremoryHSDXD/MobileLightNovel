@@ -1,5 +1,5 @@
 import Feather from '@expo/vector-icons/Feather';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
@@ -28,22 +28,27 @@ import {
   setCache,
   getDownloadedChapterUrls,
   getCategories,
+  getReadChapterUrls,
 } from '../../services/database/Database';
 import { styles } from '../../styles/details.styles';
 
 const CHAPTERS_PER_PAGE = 100;
 
 const ChapterCard = React.memo(
-  ({ item, onPress, downloadedChapters, downloadingChapters, onDownload }: any) => {
+  ({ item, onPress, downloadedChapters, downloadingChapters, onDownload, readChapters }: any) => {
     const isDownloaded = downloadedChapters.has(`chapter_${item.url}`);
     const isDownloading = downloadingChapters.has(item.url);
+    const isRead = readChapters.has(item.url);
     return (
       <View style={styles.chapterCard}>
         <TouchableOpacity
           style={styles.chapterClickableArea}
           onPress={() => onPress(item.url, item.title)}
         >
-          <Text style={styles.chapterTitle} numberOfLines={1}>
+          <Text
+            style={[styles.chapterTitle, isRead && styles.chapterTitleRead]}
+            numberOfLines={1}
+          >
             {item.title}
           </Text>
         </TouchableOpacity>
@@ -66,10 +71,13 @@ const ChapterCard = React.memo(
     const nextDownloaded = next.downloadedChapters.has(`chapter_${next.item.url}`);
     const prevDownloading = prev.downloadingChapters.has(prev.item.url);
     const nextDownloading = next.downloadingChapters.has(next.item.url);
+    const prevRead = prev.readChapters.has(prev.item.url);
+    const nextRead = next.readChapters.has(next.item.url);
     return (
       prev.item.url === next.item.url &&
       prevDownloaded === nextDownloaded &&
-      prevDownloading === nextDownloading
+      prevDownloading === nextDownloading &&
+      prevRead === nextRead
     );
   }
 );
@@ -88,6 +96,7 @@ export default function NovelDetailsScreen() {
   const [isSaved, setIsSaved] = useState(false);
   const [downloadedChapters, setDownloadedChapters] = useState<Set<string>>(new Set());
   const [downloadingChapters, setDownloadingChapters] = useState<Set<string>>(new Set());
+  const [readChapters, setReadChapters] = useState<Set<string>>(new Set());
   const [categories, setCategories] = useState<any[]>([]);
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
 
@@ -132,6 +141,8 @@ export default function NovelDetailsScreen() {
           if (details?.chapters) {
             const urls = details.chapters.map((c: any) => `chapter_${c.url}`);
             setDownloadedChapters(getDownloadedChapterUrls(urls));
+            const chapterUrls = details.chapters.map((c: any) => c.url);
+            setReadChapters(getReadChapterUrls(chapterUrls));
           }
         } catch (e) {
           console.error('Fetch or DB check error', e);
@@ -141,6 +152,15 @@ export default function NovelDetailsScreen() {
     }
     loadNovel();
   }, [url, sourceId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (novel?.chapters) {
+        const chapterUrls = novel.chapters.map((c: any) => c.url);
+        setReadChapters(getReadChapterUrls(chapterUrls));
+      }
+    }, [novel])
+  );
 
   const toggleLibrary = () => {
     if (!novel || !url) return;
@@ -461,6 +481,7 @@ export default function NovelDetailsScreen() {
                 onPress={openChapter}
                 downloadedChapters={downloadedChapters}
                 downloadingChapters={downloadingChapters}
+                readChapters={readChapters}
                 onDownload={downloadChapter}
               />
             ))}

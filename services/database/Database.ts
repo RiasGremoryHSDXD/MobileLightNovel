@@ -140,6 +140,51 @@ export const clearRequestCache = () => {
   db.execSync('VACUUM;'); // Shrink the database file and release storage back to the OS
 };
 
+// --- Reading Progress Functions ---
+
+export const saveScrollProgress = (chapterUrl: string, scrollY: number) => {
+  const key = `scroll_progress_${chapterUrl}`;
+  const statement = db.prepareSync('INSERT OR REPLACE INTO request_cache (key, data, timestamp) VALUES (?, ?, ?)');
+  statement.executeSync([key, JSON.stringify({ scrollY }), Date.now()]);
+};
+
+export const getScrollProgress = (chapterUrl: string): number => {
+  const key = `scroll_progress_${chapterUrl}`;
+  const statement = db.prepareSync('SELECT data FROM request_cache WHERE key = ? LIMIT 1');
+  const result = statement.executeSync([key]);
+  const rows = result.getAllSync();
+  if (rows.length > 0) {
+    const parsed = JSON.parse((rows[0] as any).data);
+    return parsed.scrollY || 0;
+  }
+  return 0;
+};
+
+export const markChapterRead = (chapterUrl: string) => {
+  const key = `read_chapter_${chapterUrl}`;
+  const statement = db.prepareSync('INSERT OR REPLACE INTO request_cache (key, data, timestamp) VALUES (?, ?, ?)');
+  statement.executeSync([key, '1', Date.now()]);
+};
+
+export const getReadChapterUrls = (chapterUrls: string[]): Set<string> => {
+  if (chapterUrls.length === 0) return new Set();
+  const readSet = new Set<string>();
+  const chunkSize = 500;
+  for (let i = 0; i < chapterUrls.length; i += chunkSize) {
+    const chunk = chapterUrls.slice(i, i + chunkSize);
+    const keys = chunk.map(u => `read_chapter_${u}`);
+    const placeholders = keys.map(() => '?').join(',');
+    const statement = db.prepareSync(`SELECT key FROM request_cache WHERE key IN (${placeholders})`);
+    const result = statement.executeSync(keys);
+    for (const row of result.getAllSync()) {
+      // Strip the prefix to get back the original chapterUrl
+      const original = ((row as any).key as string).replace('read_chapter_', '');
+      readSet.add(original);
+    }
+  }
+  return readSet;
+};
+
 export const getDatabaseSizeInBytes = (): number => {
   try {
     const pageCount = db.getFirstSync<{page_count: number}>('PRAGMA page_count;');

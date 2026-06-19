@@ -5,16 +5,18 @@ import { ActivityIndicator, Dimensions, FlatList, LayoutAnimation, ScrollView, S
 
 import { Text, View } from '@/components/Themed';
 // @ts-ignore
-import { addToHistory, getCache } from '../../services/database/Database';
+import { addToHistory, getCache, saveScrollProgress, getScrollProgress, markChapterRead } from '../../services/database/Database';
 import { styles } from '../../styles/reader.styles';
 import { ExtensionManager } from '../../services/extensions/ExtensionManager';
 
 const { width } = Dimensions.get('window');
 
-const ChapterPage = React.memo(({ chapter, index, sourceId, fontSize, toggleMenu, registerRef }: any) => {
+const ChapterPage = React.memo(({ chapter, index, sourceId, fontSize, toggleMenu, registerRef, onProgressSave }: any) => {
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const colorScheme = useColorScheme();
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -48,11 +50,35 @@ const ChapterPage = React.memo(({ chapter, index, sourceId, fontSize, toggleMenu
     return () => { isMounted = false; };
   }, [chapter.url, sourceId]);
 
+  // Restore scroll position once chapter content has finished loading
+  useEffect(() => {
+    if (!loading && scrollRef.current) {
+      const savedY = getScrollProgress(decodeURIComponent(chapter.url));
+      if (savedY > 10) {
+        setTimeout(() => scrollRef.current?.scrollTo({ y: savedY, animated: false }), 200);
+      }
+    }
+  }, [loading]);
+
+  const handleScroll = (e: any) => {
+    const y = e.nativeEvent.contentOffset.y;
+    // Debounce saves — write to DB at most once per second while scrolling
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveScrollProgress(decodeURIComponent(chapter.url), y);
+    }, 1000);
+  };
+
   return (
     <ScrollView
-      ref={registerRef}
+      ref={(ref) => {
+        scrollRef.current = ref;
+        registerRef(ref);
+      }}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={true}
+      onScroll={handleScroll}
+      scrollEventThrottle={500}
     >
       <TouchableOpacity activeOpacity={1} onPress={toggleMenu} style={{ minHeight: '100%' }}>
         <Text style={[styles.titleText, { fontSize: fontSize + 6, color: colorScheme === 'dark' ? '#fff' : '#000' }]}>
@@ -127,6 +153,8 @@ export default function ReaderScreen() {
           ch.url,
           ch.title
         );
+        // Mark this chapter as read for the read/unread indicator in details screen
+        markChapterRead(ch.url);
       }
     }
   }).current;
