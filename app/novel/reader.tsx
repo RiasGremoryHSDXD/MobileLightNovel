@@ -1,20 +1,18 @@
 import Feather from '@expo/vector-icons/Feather';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, LayoutAnimation, ScrollView, StatusBar, StyleSheet, TouchableOpacity, useColorScheme } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, LayoutAnimation, ScrollView, StatusBar, StyleSheet, TouchableOpacity, useColorScheme, Text, View } from 'react-native';
 
-import { Text, View } from '@/components/Themed';
 // @ts-ignore
-import { addToHistory, getCache, saveScrollProgress, getScrollProgress, markChapterRead } from '../../services/database/Database';
+import { addToHistory, getCache, saveScrollProgress, getScrollProgress, markChapterRead, getReaderSettings, saveReaderSettings, ReaderSettings } from '../../services/database/Database';
 import { styles } from '../../styles/reader.styles';
 import { ExtensionManager } from '../../services/extensions/ExtensionManager';
 
 const { width } = Dimensions.get('window');
 
-const ChapterPage = React.memo(({ chapter, index, sourceId, fontSize, toggleMenu, registerRef, onProgressSave }: any) => {
+const ChapterPage = React.memo(({ chapter, index, sourceId, fontSize, lineHeight, textColor, bgColor, toggleMenu, registerRef, onProgressSave }: any) => {
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const colorScheme = useColorScheme();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
 
@@ -75,19 +73,20 @@ const ChapterPage = React.memo(({ chapter, index, sourceId, fontSize, toggleMenu
         scrollRef.current = ref;
         registerRef(ref);
       }}
+      style={{ backgroundColor: bgColor }}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={true}
       onScroll={handleScroll}
       scrollEventThrottle={500}
     >
       <TouchableOpacity activeOpacity={1} onPress={toggleMenu} style={{ minHeight: '100%' }}>
-        <Text style={[styles.titleText, { fontSize: fontSize + 6, color: colorScheme === 'dark' ? '#fff' : '#000' }]}>
+        <Text style={[styles.titleText, { fontSize: fontSize + 6, color: textColor }]}>
           {chapter.title}
         </Text>
         {loading ? (
           <ActivityIndicator size="large" color="#1E90FF" style={{ marginTop: 50 }} />
         ) : (
-          <Text style={[styles.contentText, { fontSize, lineHeight: fontSize * 1.6, color: colorScheme === 'dark' ? '#ccc' : '#333' }]}>
+          <Text style={[styles.contentText, { fontSize, lineHeight: fontSize * lineHeight, color: textColor }]}>
             {content}
           </Text>
         )}
@@ -103,8 +102,37 @@ export default function ReaderScreen() {
 
   const [chapters, setChapters] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
-  const [fontSize, setFontSize] = useState(18);
+  const [settings, setSettings] = useState<ReaderSettings>(() => getReaderSettings());
   const [showMenu, setShowMenu] = useState(true);
+
+  const updateSettings = (newSettings: Partial<ReaderSettings>) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const updated = { ...settings, ...newSettings };
+    setSettings(updated);
+    saveReaderSettings(newSettings);
+  };
+
+  let bgColor = colorScheme === 'dark' ? '#000000' : '#ffffff';
+  let textColor = colorScheme === 'dark' ? '#cccccc' : '#333333';
+  let menuBgColor = colorScheme === 'dark' ? '#111111' : '#eeeeee';
+  let menuIconColor = colorScheme === 'dark' ? '#ffffff' : '#000000';
+
+  if (settings.theme === 'dark') {
+    bgColor = '#000000';
+    textColor = '#cccccc';
+    menuBgColor = '#111111';
+    menuIconColor = '#ffffff';
+  } else if (settings.theme === 'light') {
+    bgColor = '#ffffff';
+    textColor = '#333333';
+    menuBgColor = '#eeeeee';
+    menuIconColor = '#000000';
+  } else if (settings.theme === 'sepia') {
+    bgColor = '#F4ECD8';
+    textColor = '#5B4636';
+    menuBgColor = '#E6DECA';
+    menuIconColor = '#5B4636';
+  }
 
   const flatListRef = useRef<FlatList>(null);
   const scrollRefs = useRef<{ [key: number]: ScrollView | null }>({}).current;
@@ -132,11 +160,6 @@ export default function ReaderScreen() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowMenu(prev => !prev);
   }, []);
-
-  const updateFontSize = (newSize: number) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setFontSize(newSize);
-  };
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
@@ -193,14 +216,16 @@ export default function ReaderScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: bgColor }]}>
       <Stack.Screen
         options={{
           title: chapters[currentIndex]?.title || decodeURIComponent(title as string || 'Reading'),
           headerShown: showMenu,
           headerTransparent: true,
+          headerTintColor: textColor,
+          headerTitleStyle: { color: textColor },
           headerBackground: () => (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: colorScheme === 'dark' ? 'rgba(0,0,0,0.9)' : 'rgba(255,255,255,0.9)' }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: menuBgColor, opacity: 0.95 }]} />
           )
         }}
       />
@@ -221,12 +246,15 @@ export default function ReaderScreen() {
         initialNumToRender={1}
         keyExtractor={(item, index) => item.url + index}
         renderItem={({ item, index }) => (
-          <View style={{ width }}>
+          <View style={{ width, backgroundColor: bgColor }}>
             <ChapterPage
               chapter={item}
               index={index}
               sourceId={sourceId}
-              fontSize={fontSize}
+              fontSize={settings.fontSize}
+              lineHeight={settings.lineHeight}
+              textColor={textColor}
+              bgColor={bgColor}
               toggleMenu={toggleMenu}
               registerRef={(ref: any) => { scrollRefs[index] = ref; }}
             />
@@ -235,32 +263,53 @@ export default function ReaderScreen() {
       />
 
       {showMenu && (
-        <View style={[styles.bottomMenu, { backgroundColor: colorScheme === 'dark' ? '#111' : '#eee' }]}>
-          <TouchableOpacity onPress={scrollToTop} style={styles.menuIcon}>
-            <Feather name="chevrons-up" size={22} color={colorScheme === 'dark' ? '#fff' : '#000'} />
-          </TouchableOpacity>
+        <View style={[styles.bottomMenu, { backgroundColor: menuBgColor, flexDirection: 'column' }]}>
+          <View style={styles.settingsRow}>
+            <TouchableOpacity onPress={scrollToTop} style={styles.menuIcon}>
+              <Feather name="chevrons-up" size={22} color={menuIconColor} />
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={handlePreviousChapter} style={[styles.menuIcon, { opacity: hasPrev ? 1 : 0.3 }]} disabled={!hasPrev}>
-            <Feather name="chevron-left" size={22} color={colorScheme === 'dark' ? '#fff' : '#000'} />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={handlePreviousChapter} style={[styles.menuIcon, { opacity: hasPrev ? 1 : 0.3 }]} disabled={!hasPrev}>
+              <Feather name="chevron-left" size={22} color={menuIconColor} />
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => updateFontSize(Math.max(12, fontSize - 2))} style={styles.menuIcon}>
-            <Feather name="minus" size={22} color={colorScheme === 'dark' ? '#fff' : '#000'} />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => updateSettings({ fontSize: Math.max(12, settings.fontSize - 2) })} style={styles.menuIcon}>
+              <Feather name="minus" size={22} color={menuIconColor} />
+            </TouchableOpacity>
 
-          <Text style={{ fontSize: 14, fontWeight: 'bold' }}>{fontSize}</Text>
+            <Text style={{ fontSize: 14, fontWeight: 'bold', color: menuIconColor }}>{settings.fontSize}</Text>
 
-          <TouchableOpacity onPress={() => updateFontSize(Math.min(32, fontSize + 2))} style={styles.menuIcon}>
-            <Feather name="plus" size={22} color={colorScheme === 'dark' ? '#fff' : '#000'} />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => updateSettings({ fontSize: Math.min(32, settings.fontSize + 2) })} style={styles.menuIcon}>
+              <Feather name="plus" size={22} color={menuIconColor} />
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleNextChapter} style={[styles.menuIcon, { opacity: hasNext ? 1 : 0.3 }]} disabled={!hasNext}>
-            <Feather name="chevron-right" size={22} color={colorScheme === 'dark' ? '#fff' : '#000'} />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={handleNextChapter} style={[styles.menuIcon, { opacity: hasNext ? 1 : 0.3 }]} disabled={!hasNext}>
+              <Feather name="chevron-right" size={22} color={menuIconColor} />
+            </TouchableOpacity>
 
-          <TouchableOpacity onPress={scrollToBottom} style={styles.menuIcon}>
-            <Feather name="chevrons-down" size={22} color={colorScheme === 'dark' ? '#fff' : '#000'} />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={scrollToBottom} style={styles.menuIcon}>
+              <Feather name="chevrons-down" size={22} color={menuIconColor} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.settingsRow, { width: '100%', paddingHorizontal: 20 }]}>
+            <Text style={{ color: menuIconColor, fontWeight: 'bold' }}>Spacing</Text>
+            <TouchableOpacity onPress={() => updateSettings({ lineHeight: Math.max(1.0, settings.lineHeight - 0.2) })} style={styles.menuIcon}>
+              <Feather name="minimize-2" size={20} color={menuIconColor} />
+            </TouchableOpacity>
+            <Text style={{ color: menuIconColor, width: 30, textAlign: 'center' }}>{settings.lineHeight.toFixed(1)}</Text>
+            <TouchableOpacity onPress={() => updateSettings({ lineHeight: Math.min(2.4, settings.lineHeight + 0.2) })} style={styles.menuIcon}>
+              <Feather name="maximize-2" size={20} color={menuIconColor} />
+            </TouchableOpacity>
+
+            <View style={{ width: 20 }} />
+
+            <TouchableOpacity onPress={() => updateSettings({ theme: 'light' })} style={[styles.themeButton, { backgroundColor: '#ffffff', borderColor: '#ccc' }, settings.theme === 'light' && styles.themeButtonActive]} />
+            <View style={{ width: 10 }} />
+            <TouchableOpacity onPress={() => updateSettings({ theme: 'sepia' })} style={[styles.themeButton, { backgroundColor: '#F4ECD8', borderColor: '#ccc' }, settings.theme === 'sepia' && styles.themeButtonActive]} />
+            <View style={{ width: 10 }} />
+            <TouchableOpacity onPress={() => updateSettings({ theme: 'dark' })} style={[styles.themeButton, { backgroundColor: '#000000', borderColor: '#555' }, settings.theme === 'dark' && styles.themeButtonActive]} />
+          </View>
         </View>
       )}
     </View>

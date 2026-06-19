@@ -185,6 +185,40 @@ export const getReadChapterUrls = (chapterUrls: string[]): Set<string> => {
   return readSet;
 };
 
+// --- Reader Settings ---
+export interface ReaderSettings {
+  fontSize: number;
+  lineHeight: number;
+  theme: 'system' | 'light' | 'dark' | 'sepia';
+}
+
+const DEFAULT_SETTINGS: ReaderSettings = {
+  fontSize: 18,
+  lineHeight: 1.6,
+  theme: 'system',
+};
+
+export const getReaderSettings = (): ReaderSettings => {
+  const statement = db.prepareSync('SELECT data FROM request_cache WHERE key = ? LIMIT 1');
+  const result = statement.executeSync(['reader_settings']);
+  const rows = result.getAllSync();
+  if (rows.length > 0) {
+    try {
+      return { ...DEFAULT_SETTINGS, ...JSON.parse((rows[0] as any).data) };
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  }
+  return DEFAULT_SETTINGS;
+};
+
+export const saveReaderSettings = (settings: Partial<ReaderSettings>) => {
+  const current = getReaderSettings();
+  const updated = { ...current, ...settings };
+  const statement = db.prepareSync('INSERT OR REPLACE INTO request_cache (key, data, timestamp) VALUES (?, ?, ?)');
+  statement.executeSync(['reader_settings', JSON.stringify(updated), Date.now()]);
+};
+
 export const getDatabaseSizeInBytes = (): number => {
   try {
     const pageCount = db.getFirstSync<{page_count: number}>('PRAGMA page_count;');
