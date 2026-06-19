@@ -3,21 +3,9 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
-import * as BackgroundTask from 'expo-background-task';
-import * as TaskManager from 'expo-task-manager';
-import { checkForUpdates } from '../services/updates/UpdateManager';
 import { useColorScheme } from '@/components/useColorScheme';
 import { DownloadProvider } from '@/contexts/DownloadContext';
-
-const BACKGROUND_UPDATE_TASK = 'BACKGROUND_UPDATE_TASK';
-
-TaskManager.defineTask(BACKGROUND_UPDATE_TASK, async () => {
-  try {
-    await checkForUpdates();
-  } catch (error) {
-    console.error("Background task failed", error);
-  }
-});
+import { registerBackgroundFetchAsync } from '../services/background/BackgroundTask';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -55,28 +43,11 @@ export default function RootLayout() {
   return <RootLayoutNav />;
 }
 
-import Constants from 'expo-constants';
-
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   useEffect(() => {
-    async function registerBackgroundFetch() {
-      // Background tasks are only available in standalone development builds or APKs, not in standard Expo Go.
-      if (Constants.appOwnership === 'expo') {
-        console.log("Running in Expo Go. Background tasks disabled to prevent warnings.");
-        return;
-      }
-      try {
-        await BackgroundTask.registerTaskAsync(BACKGROUND_UPDATE_TASK, {
-          minimumInterval: 60 * 60 * 12, // 12 hours
-        });
-        console.log("Background fetch registered");
-      } catch (err) {
-        console.log("Background fetch failed to register (Likely running in Expo Go). Warning suppressed.", err);
-      }
-    }
-    registerBackgroundFetch();
+    registerBackgroundFetchAsync();
   }, []);
 
   return (
