@@ -24,12 +24,33 @@ export const styles = StyleSheet.create({
   novelCard: {
     flex: 1,
     margin: 5,
-    maxWidth: '33%',
+    maxWidth: '33.33%', // slightly adjust to allow wrapping 3 cols precisely
+  },
+  novelCard2Col: {
+    flex: 1,
+    margin: 6,
+    maxWidth: '50%',
+  },
+  novelCardList: {
+    flex: 1,
+    flexDirection: 'row',
+    marginHorizontal: 8,
+    marginVertical: 6,
+    maxWidth: '100%',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 10,
+    padding: 10,
   },
   coverImage: {
     width: '100%',
     aspectRatio: 2/3,
     borderRadius: 6,
+  },
+  coverImageList: {
+    width: 60,
+    aspectRatio: 2/3,
+    borderRadius: 4,
   },
   placeholderCover: {
     width: '100%',
@@ -37,11 +58,34 @@ export const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#333',
   },
+  placeholderCoverList: {
+    width: 60,
+    aspectRatio: 2/3,
+    borderRadius: 4,
+    backgroundColor: '#333',
+  },
   novelTitle: {
     marginTop: 5,
     fontSize: 12,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  novelTitleList: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'left',
+    marginLeft: 14,
+    flex: 1,
+  },
+  novelListInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  novelListSubText: {
+    fontSize: 12,
+    color: '#888',
+    marginLeft: 14,
+    marginTop: 4,
   },
   tabContainer: {
     borderBottomWidth: 1,
