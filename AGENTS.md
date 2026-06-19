@@ -14,7 +14,7 @@ When starting development on a new feature or a significant fix, you MUST proact
 # Feature Planning & User Behavior Anticipation
 Before writing any code for a new feature, you MUST think like an end-user with zero programming knowledge. Anticipate common or irrational user behaviors (e.g., button mashing, navigating away abruptly, offline states) that could cause crashes or bugs. 
 
-You MUST provide a structured pre-implementation plan that includes:
+You MUST output a structured pre-implementation plan in your response before presenting any code, which includes:
 1. **Workflow**: Step-by-step logic of how the function will operate.
 2. **Files Affected**: Existing files to modify and new files to create.
 3. **Edge Cases & User Mistakes**: A list of irrational or edge-case user actions (e.g., "User taps download 5 times really fast while offline").
