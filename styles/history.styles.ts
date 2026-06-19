@@ -98,4 +98,13 @@ export const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 4,
   },
+  deleteActionContainer: {
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    marginBottom: 15,
+    borderRadius: 12,
+    paddingRight: 20,
+    width: '100%',
+  },
 });
