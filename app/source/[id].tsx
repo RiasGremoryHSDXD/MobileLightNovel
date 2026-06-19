@@ -24,37 +24,68 @@ export default function SourceScreen() {
   const [loading, setLoading] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  // Cache the initial popular novels so we can restore them when search closes
-  const popularNovelsRef = useRef<any[]>([]);
+  // Pagination & Tabs State
+  const [browseTab, setBrowseTab] = useState<'popular' | 'latest'>('popular');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  useEffect(() => {
-    async function loadNovels() {
-      const cacheKey = `source_browse_${id}`;
-      const cached = await getCache(cacheKey);
-      if (cached) {
-        setResults(cached);
-        popularNovelsRef.current = cached;
+  // Cache the fetched novels so we can restore them when search closes or switching tabs rapidly
+  const cachedNovelsRef = useRef<Record<string, any[]>>({ popular: [], latest: [] });
+
+  const loadNovels = useCallback(async (pageNum: number, tab: 'popular' | 'latest', isLoadMore = false) => {
+    if (!extension) return;
+    if (pageNum === 1 && !isLoadMore) setLoading(true);
+    if (isLoadMore) setLoadingMore(true);
+
+    try {
+      let data = [];
+      if (tab === 'popular' && (extension as any).getPopularNovels) {
+        data = await (extension as any).getPopularNovels(pageNum);
+      } else if (tab === 'latest' && (extension as any).getLatestUpdates) {
+        data = await (extension as any).getLatestUpdates(pageNum);
+      } else {
+        // Fallback
+        if (pageNum === 1) data = await extension.searchNovel('');
       }
 
-      const extension = ExtensionManager.getExtension(id as string);
-      if (extension) {
-        if (!cached) setLoading(true);
-        try {
-          const data = (extension as any).getPopularNovels 
-            ? await (extension as any).getPopularNovels() 
-            : await extension.searchNovel('');
-          setResults(data || []);
-          popularNovelsRef.current = data || [];
-          setCache(cacheKey, data || []);
-        } catch (e) {
-          console.error('Failed to fetch popular novels', e);
-        } finally {
-          setLoading(false);
+      if (data.length === 0) {
+        setHasMore(false);
+      } else {
+        if (isLoadMore) {
+          setResults(prev => [...prev, ...data]);
+          cachedNovelsRef.current[tab] = [...cachedNovelsRef.current[tab], ...data];
+        } else {
+          setResults(data);
+          cachedNovelsRef.current[tab] = data;
         }
       }
+    } catch (e) {
+      console.error(`Failed to fetch ${tab} novels`, e);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
-    loadNovels();
-  }, [id]);
+  }, [extension]);
+
+  useEffect(() => {
+    // Initial load when tab changes
+    setPage(1);
+    setHasMore(true);
+    // If we already have it cached, show instantly to avoid flicker, but still fetch silently (or skip fetch)
+    if (cachedNovelsRef.current[browseTab].length > 0) {
+      setResults(cachedNovelsRef.current[browseTab]);
+    } else {
+      loadNovels(1, browseTab);
+    }
+  }, [browseTab, loadNovels]);
+
+  const handleLoadMore = () => {
+    if (!hasMore || loadingMore || loading || showSearch) return;
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadNovels(nextPage, browseTab, true);
+  };
 
   const handleSearch = useCallback(async () => {
     const query = searchRef.current.trim();
@@ -73,9 +104,9 @@ export default function SourceScreen() {
   const closeSearch = useCallback(() => {
     searchRef.current = '';
     setShowSearch(false);
-    // Restore the popular novels list
-    setResults(popularNovelsRef.current);
-  }, []);
+    // Restore the currently active tab's list
+    setResults(cachedNovelsRef.current[browseTab]);
+  }, [browseTab]);
 
   const openSearch = useCallback(() => {
     setShowSearch(true);
@@ -155,14 +186,28 @@ export default function SourceScreen() {
         }} 
       />
 
+      {!showSearch && (
+        <View style={styles.tabContainer}>
+          <TouchableOpacity style={[styles.tabButton, browseTab === 'popular' && styles.activeTab]} onPress={() => setBrowseTab('popular')}>
+            <Text style={[styles.tabText, browseTab === 'popular' && styles.activeTabText]}>Popular</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tabButton, browseTab === 'latest' && styles.activeTab]} onPress={() => setBrowseTab('latest')}>
+            <Text style={[styles.tabText, browseTab === 'latest' && styles.activeTabText]}>Latest</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {loading ? (
         <ActivityIndicator size="large" color="#1E90FF" style={{ marginTop: 20 }} />
       ) : results.length > 0 ? (
         <FlatList
           data={results}
-          keyExtractor={(item, index) => index.toString()}
+          keyExtractor={(item, index) => index.toString() + item.novelUrl}
           renderItem={renderItem}
           contentContainerStyle={styles.listContainer}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={loadingMore ? <ActivityIndicator size="small" color="#1E90FF" style={{ margin: 20 }} /> : null}
         />
       ) : (
         <ScrollView
@@ -220,5 +265,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 50,
     color: '#888',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(150,150,150,0.2)',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#1E90FF',
+  },
+  tabText: {
+    fontSize: 14,
+    color: '#888',
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: '#1E90FF',
   },
 });
