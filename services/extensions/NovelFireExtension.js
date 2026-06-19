@@ -108,13 +108,24 @@ export const NovelFireExtension = {
       // Chapter count: inside .header-stats, look for the element labelled "Chapters"
       // Structure: <div class="header-stats"><span><strong>3050</strong> Chapters</span>...
       let totalChapters = 0;
+      let status = 'Unknown';
+      let views = null;
       $('.header-stats span').each((i, el) => {
         const text = $(el).text();
+        const strongText = $(el).find('strong').text().trim();
+        
         if (text.toLowerCase().includes('chapter')) {
-          const num = parseInt($(el).find('strong').text().replace(/[^0-9]/g, ''));
+          const num = parseInt(strongText.replace(/[^0-9]/g, ''));
           if (!isNaN(num) && num > 0) totalChapters = num;
+        } else if (text.toLowerCase().includes('status')) {
+          status = strongText;
+        } else if (text.toLowerCase().includes('views') || $(el).find('.icon-eye').length > 0) {
+          views = strongText;
         }
       });
+
+      // Rating: inside .rating
+      let rating = $('.rating strong.nub').text().trim() || $('.my-rating').attr('data-rating') || null;
 
       // Build chapter list from 1 to totalChapters
       // NovelFire uses /book/<slug>/chapter-<n> format
@@ -137,6 +148,9 @@ export const NovelFireExtension = {
       return {
         title,
         author: author || 'Unknown',
+        status,
+        rating,
+        views,
         coverUrl: coverUrl
           ? (coverUrl.startsWith('http') ? coverUrl : `${BASE_URL}${coverUrl}`)
           : null,
