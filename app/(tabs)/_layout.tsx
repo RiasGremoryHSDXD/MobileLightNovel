@@ -75,6 +75,7 @@ export default function TabLayout() {
         name="more"
         options={{
           title: 'More',
+          headerTitle: 'Settings',
           tabBarIcon: ({ color }) => <TabBarIcon name="more-horizontal" color={color} />,
         }}
       />
