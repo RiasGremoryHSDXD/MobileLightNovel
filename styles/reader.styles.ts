@@ -51,5 +51,21 @@ export const styles = StyleSheet.create({
   },
   menuIcon: {
     padding: 10,
+  },
+  sliderContainer: {
+    paddingHorizontal: 20,
+    marginTop: 10,
+    alignItems: 'stretch',
+    justifyContent: 'center',
+  },
+  slider: {
+    height: 40,
+    width: '100%',
+  },
+  sliderText: {
+    textAlign: 'center',
+    fontSize: 12,
+    marginBottom: 5,
+    fontWeight: '600',
   }
 });

@@ -7,6 +7,7 @@ import { ActivityIndicator, Dimensions, FlatList, LayoutAnimation, ScrollView, S
 import { addToHistory, getCache, saveScrollProgress, getScrollProgress, markChapterRead, getReaderSettings, saveReaderSettings, ReaderSettings } from '../../services/database/Database';
 import { styles } from '../../styles/reader.styles';
 import { ExtensionManager } from '../../services/extensions/ExtensionManager';
+import Slider from '@react-native-community/slider';
 
 const { width } = Dimensions.get('window');
 
@@ -104,6 +105,8 @@ export default function ReaderScreen() {
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [settings, setSettings] = useState<ReaderSettings>(() => getReaderSettings());
   const [showMenu, setShowMenu] = useState(true);
+  const [sliderValue, setSliderValue] = useState<number | null>(null);
+  const [isSliding, setIsSliding] = useState(false);
 
   const updateSettings = (newSettings: Partial<ReaderSettings>) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -162,7 +165,7 @@ export default function ReaderScreen() {
   }, []);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) {
+    if (viewableItems.length > 0 && !isSliding) {
       const newIndex = viewableItems[0].index;
       setCurrentIndex(newIndex);
 
@@ -238,6 +241,12 @@ export default function ReaderScreen() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         initialScrollIndex={currentIndex}
+        onScrollToIndexFailed={(info) => {
+          const wait = new Promise(resolve => setTimeout(resolve, 100));
+          wait.then(() => {
+            flatListRef.current?.scrollToOffset({ offset: info.index * width, animated: false });
+          });
+        }}
         getItemLayout={(data, index) => ({ length: width, offset: width * index, index })}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
@@ -310,6 +319,36 @@ export default function ReaderScreen() {
             <View style={{ width: 10 }} />
             <TouchableOpacity onPress={() => updateSettings({ theme: 'dark' })} style={[styles.themeButton, { backgroundColor: '#000000', borderColor: '#555' }, settings.theme === 'dark' && styles.themeButtonActive]} />
           </View>
+
+          {/* Chapter Slider */}
+          {chapters.length > 1 && (
+            <View style={styles.sliderContainer}>
+              <Text style={[styles.sliderText, { color: menuIconColor }]}>
+                {sliderValue !== null ? `Chapter ${sliderValue}` : `Chapter ${currentIndex + 1} of ${chapters.length}`}
+              </Text>
+              <Slider
+                style={styles.slider}
+                minimumValue={1}
+                maximumValue={chapters.length}
+                step={1}
+                value={sliderValue !== null ? sliderValue : currentIndex + 1}
+                minimumTrackTintColor="#1E90FF"
+                maximumTrackTintColor={textColor + '50'}
+                thumbTintColor="#1E90FF"
+                onValueChange={(val) => {
+                  setSliderValue(val);
+                }}
+                onSlidingStart={() => setIsSliding(true)}
+                onSlidingComplete={(val) => {
+                  const targetIndex = val - 1;
+                  setSliderValue(null);
+                  setCurrentIndex(targetIndex);
+                  flatListRef.current?.scrollToIndex({ index: targetIndex, animated: false });
+                  setTimeout(() => setIsSliding(false), 300);
+                }}
+              />
+            </View>
+          )}
         </View>
       )}
     </View>
